@@ -1,0 +1,81 @@
+# Build outputs
+target/
+build/
+out/
+*.jar
+*.war
+*.ear
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+!**/.mvn/wrapper/maven-wrapper.jar
+
+# 로컬에 풀어둔 Maven 배포본 (mvnw 사용)
+apache-maven-*/
+maven_output.txt
+
+# Gradle
+.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Spring 로컬 전용 설정 (시크릿 포함)
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-local.properties
+
+# Database
+*.db
+*.sqlite
+*.sql
+!**/db/migration/*.sql
+!schema.sql
+**/data-local.sql
+mysql-init/
+mysql_data/
+
+# SSL Certificates (민감 정보)
+*.pem
+*.key
+*.crt
+*.cert
+certbot/
+certbot-conf/
+certbot-www/
+
+# 구동 중인 백엔드 서버 정보 (deploy.sh가 생성)
+nginx/conf.d/active-backend.inc
+
+# Process ID / Temp
+*.pid
+*.tmp
+*.temp
+
+# Bruno 환경변수 (민감 정보)
+bruno/**/environments/*.bru
+!bruno/**/environments/*.example.bru
+
+# Test results
+load-tests/results/
+*.zip
+replacements.txt

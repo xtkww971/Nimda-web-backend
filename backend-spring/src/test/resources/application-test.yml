@@ -1,0 +1,77 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: false
+
+  flyway:
+    enabled: false
+
+  sql:
+    init:
+      mode: never
+
+  security:
+    user:
+      name: admin
+      password: test-admin-password
+
+  mail:
+    host: localhost
+    port: 25
+    username: test_user
+    password: test_password
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+cloud:
+  aws:
+    credentials:
+      access-key: test-access-key
+      secret-key: test-secret-key
+    region:
+      static: ap-northeast-2
+    stack:
+      auto: false
+
+server:
+  port: 0
+
+logging:
+  level:
+    com.nimda.cup: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+
+aws:
+  s3:
+    bucket: test-bucket
+    region: ap-northeast-2
+    access-key: test-access-key
+    secret-key: test-secret-key
+
+    profile-image-path: profiles/
+    board-image-path: boards/
+    board-file-path: boards/files/
+
+jwt:
+  secret: bmltZGEtcHVibGljLW1pcnJvci10ZXN0LW9ubHktand0LXNlY3JldC1ub3QtdXNlZC1pbi1wcm9kdWN0aW9u
