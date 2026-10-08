@@ -28,15 +28,24 @@ docker compose up -d backend-$TARGET_COLOR
 
 echo "⏳ 새 버전($TARGET_COLOR) 부팅 및 헬스체크 대기 중..."
 # 새 버전 정상 작동 확인
+HEALTHY=false
 for retry in {1..24}
 do
     status_code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$TARGET_PORT/error)
-    if [ "$status_code" -ne 000]; then
+    if [ "$status_code" != "000" ]; then
         echo "✅ $TARGET_COLOR 서버가 정상 응답합니다. (Status: $status_code)"
+        HEALTHY=true
         break
     fi
     sleep 5
 done
+
+# 헬스체크 실패 시 트래픽 전환 없이 새 버전만 내리고 중단
+if [ "$HEALTHY" != true ]; then
+    echo "❌ $TARGET_COLOR 서버가 응답하지 않습니다. 배포를 중단하고 $ACTIVE_COLOR 를 유지합니다."
+    docker compose stop backend-$TARGET_COLOR
+    exit 1
+fi
 
 # 정상 작동 시 구동되어야 할 서버를 .inc에 저장
 echo "server backend-$TARGET_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
