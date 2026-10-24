@@ -1,5 +1,9 @@
 package com.nimda.cite.config;
 
+import judgeServer.domain.challenge.instance.Config.InstanceProperties;
+import judgeServer.domain.challenge.instance.Proxy.InstanceProxy;
+import judgeServer.domain.challenge.instance.Proxy.SubdomainInstanceProxyFilter;
+import judgeServer.domain.challenge.instance.Repository.InstanceResultStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -26,6 +30,17 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    // 인스턴스 서브도메인 프록시 필터 구성요소 (judgeServer.domain.challenge.instance)
+    @Autowired
+    private InstanceProperties instanceProperties;
+    @Autowired
+    private InstanceResultStore instanceResultStore;
+    @Autowired
+    private InstanceProxy instanceProxy;
+    // 결과 메시지에 userId가 없어져서, 소유권 확인은 발행 시 남긴 uuid → 사용자 매핑으로 한다.
+    @Autowired
+    private judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer ctfRequestProducer;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -38,6 +53,12 @@ public class SecurityConfig {
 
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:*",
+                "http://127.0.0.1:*",
+                // 개발용. CTF 인스턴스는 inst-{id}.{도메인} 서브도메인으로 접속하므로(ADR-0011)
+                // 로컬에서도 도메인 트리가 있는 호스트가 필요해 nip.io를 쓴다. 이 이름들은 항상
+                // 루프백(127.0.0.1)으로만 풀리니 외부에 열리는 출처가 아니다.
+                "http://127.0.0.1.nip.io:*",
+                "http://*.127.0.0.1.nip.io:*",
                 "http://43.200.36.32:*",
                 "https://43.200.36.32:*",
                 "https://nimda.kr",
@@ -72,6 +93,13 @@ public class SecurityConfig {
 
                 // 4. JWT 인증 필터 추가 (UsernamePasswordAuthenticationFilter 실행 전 검사)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 4-1. 인스턴스 서브도메인 프록시 필터 (JWT 인증 직후 → SecurityContext에 사용자 채워짐).
+                //      inst-{token}.{도메인} 요청이면 소유권 확인 후 인스턴스로 프록시하고 체인을 끊는다.
+                .addFilterAfter(
+                        new SubdomainInstanceProxyFilter(
+                                instanceProperties, instanceResultStore, instanceProxy, ctfRequestProducer),
+                        JwtAuthenticationFilter.class)
 
                 // 5. 요청별 권한 제어 (순서가 매우 중요함)
                 .authorizeHttpRequests(authz -> authz
@@ -123,23 +151,18 @@ public class SecurityConfig {
                         .requestMatchers("/api/cite/admin/profile-decorations/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/users/*/role").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/groups", "/api/cite/category/all").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/groups", "/api/problems", "/api/contest").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/problems/**", "/api/contest/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/problems/**", "/api/contest/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/cite/category/all").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/groups").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/cite/category/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/cite/category/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/cite/category/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/problems/*/admin").hasRole("ADMIN")
 
-                        // 채점 서버 api
-                        .requestMatchers(HttpMethod.POST, "/api/judge/problem").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "api/judge/problem/toggle-public").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "api/judge/problem").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/judge/problem/**").authenticated()
-
-                        // 재출 api
-                        .requestMatchers(HttpMethod.POST, "api/judge/submission").authenticated()
+                        // CTF 문제 api (등록/삭제/공개전환은 관리자만)
+                        // 첨부파일 다운로드는 참가자가 쓰는 기능이라 아래 ADMIN 규칙보다 먼저 둔다
+                        // (규칙은 먼저 걸리는 것이 이긴다).
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*/download").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasRole("ADMIN")
 
                         // [우선순위 7] 나머지 모든 요청은 기본적으로 인증 필요
                         .anyRequest().authenticated()

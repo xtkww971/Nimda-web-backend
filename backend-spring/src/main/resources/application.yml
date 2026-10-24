@@ -11,7 +11,7 @@ spring:
       password: ${SPRING_REDIS_PASSWORD:}
   application:
     name: nimda-cup
-  # 이메일 설정 (Spring Mail)
+  # AWS SMTP 이메일 설정
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -96,13 +96,32 @@ jwt:
 auth:
   cookie:
     secure: ${AUTH_COOKIE_SECURE:true}
+    # todo 인스턴스 접근 보안 로직 미구현
+    domain: ${AUTH_COOKIE_DOMAIN:}
 
-judge:
+ctf:
   queue:
-    stream-key: ${JUDGE_QUEUE_STREAM_KEY:judge:submissions}
-    consumer-group: ${JUDGE_QUEUE_CONSUMER_GROUP:judge-workers}
+    # 인스턴스 생성과 첨부파일 발급이 한 스트림을 쓴다. Go 조율자의 CTF_QUEUE_* 와 같아야 한다.
+    stream-key: ${CTF_QUEUE_STREAM_KEY:ctf:request:ops}
+    consumer-group: ${CTF_QUEUE_CONSUMER_GROUP:ctf-provisioners}
+    result-stream-key: ${CTF_QUEUE_RESULT_STREAM_KEY:ctf:request:results}
+    result-consumer-group: ${CTF_QUEUE_RESULT_CONSUMER_GROUP:ctf-result-consumers}
+  # todo 인스턴스 서브도메인 접근 로직 단순화
+  instance:
+    base-domain: ${CTF_INSTANCE_BASE_DOMAIN:}
+    subdomain-prefix: ${CTF_INSTANCE_SUBDOMAIN_PREFIX:inst-}
+  # Redis 키 보관 시간 (CtfTtlProperties). 단위 예: 30s, 10m, 1h. result <= owner, mapping 을 지킬 것.
+  ttl:
+    # 조율자 결과(ctf:result:{uuid})
+    result: ${CTF_TTL_RESULT:10m}
+    # uuid -> {userId, challengeCode} 요청 매핑
+    owner: ${CTF_TTL_OWNER:30m}
+    # 인스턴스 상태(ctf:instance:status{uuid})
+    status: ${CTF_TTL_STATUS:10m}
+    # userId:challengeId -> requestId 매핑. todo 미구현
+    mapping: ${CTF_TTL_MAPPING:30m}
 
-# 첨부파일 로컬 저장 (cite attachment)
+# 첨부파일 로컬 저장 (cite attachment) - S3 연결이 안되면 로컬 디스크에 저장됩니다.
 nimda:
   file:
     upload-dir: ${FILE_UPLOAD_DIR:${user.home}/nimda-attachments}
@@ -111,7 +130,7 @@ nimda:
 # 미설정 시 첨부는 nimda.file.upload-dir(로컬 디스크)만 사용합니다.
 aws:
   s3:
-    bucket: ${AWS_S3_BUCKET:nimda-bucket}
+    bucket: ${AWS_S3_BUCKET:nimda-website}
     region: ${AWS_S3_REGION:ap-northeast-2}
     access-key: ${AWS_S3_ACCESS_KEY:}
     secret-key: ${AWS_S3_SECRET_KEY:}
@@ -120,7 +139,7 @@ aws:
     profile-image-path: profiles/ # 프로필 이미지 저장
     board-image-path: boards/ # 게시판 이미지
     board-file-path: boards/files/ # 게시판 첨부파일
-    problem-file-path: problems/
+    challenge-path: challenges/
 
     # 파일 크기 제한 
     max-file-size: 10485760 # 10mb
