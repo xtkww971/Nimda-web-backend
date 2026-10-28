@@ -86,6 +86,10 @@ server:
   # 환경변수로 오버라이드 가능 (docker-compose.yml에서 설정)
   # 기본값: 8080 (nginx가 프록시하므로 내부 포트 사용)
   port: ${SERVER_PORT:8080}
+  # nginx가 TLS를 끝내고 http로 넘기므로, X-Forwarded-Proto/Host를 믿어야 scheme이 https로 잡힌다.
+  # (CTF 인스턴스 접속 주소 accessUrl이 request.getScheme()을 쓴다)
+  # Tomcat RemoteIpValve는 사설 대역(도커 망)에서 온 헤더만 믿는다.
+  forward-headers-strategy: native
 
 # JWT 설정
 jwt:
