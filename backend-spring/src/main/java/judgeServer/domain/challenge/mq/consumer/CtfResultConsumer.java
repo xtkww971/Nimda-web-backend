@@ -3,6 +3,7 @@ package judgeServer.domain.challenge.mq.consumer;
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.download.ChallengeDownloadUrlCache;
+import judgeServer.domain.challenge.instance.Repository.InstanceResultStore;
 import judgeServer.domain.challenge.mq.message.CtfResultMessage;
 import judgeServer.domain.challenge.mq.message.RequestStatus;
 import judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer;
@@ -12,6 +13,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 /**
@@ -32,18 +35,21 @@ public class CtfResultConsumer extends StreamResultConsumer<CtfResultMessage> {
     private final CtfTtlProperties ttlProperties;
     private final ChallengeDownloadUrlCache urlCache;
     private final RedisCtfRequestProducer producer;
+    private final InstanceResultStore instanceResultStore;
 
     public CtfResultConsumer(RedisConnectionFactory connectionFactory,
                              StringRedisTemplate redisTemplate,
                              CtfQueueProperties props,
                              CtfTtlProperties ttlProperties,
                              ChallengeDownloadUrlCache urlCache,
-                             RedisCtfRequestProducer producer) {
+                             RedisCtfRequestProducer producer,
+                             InstanceResultStore instanceResultStore) {
         super(connectionFactory, redisTemplate);
         this.props = props;
         this.ttlProperties = ttlProperties;
         this.urlCache = urlCache;
         this.producer = producer;
+        this.instanceResultStore = instanceResultStore;
     }
 
     @Override
@@ -83,7 +89,11 @@ public class CtfResultConsumer extends StreamResultConsumer<CtfResultMessage> {
      */
     @Override
     protected void afterStored(CtfResultMessage result, Map<String, String> fields) {
-        if (result.getStatus() != RequestStatus.READY || !result.isDownload()) {
+        if (result.getStatus() != RequestStatus.READY) {
+            return;
+        }
+        if (!result.isDownload()) {
+            extendToInstanceExpiry(result);
             return;
         }
         String challengeCode = producer.findChallengeCode(result.getUuid());
@@ -92,6 +102,43 @@ public class CtfResultConsumer extends StreamResultConsumer<CtfResultMessage> {
             return;
         }
         urlCache.put(challengeCode, result.getDownloadUrl(), result.getExpiresAt());
+    }
+
+    /**
+     * 인스턴스 결과는 컨테이너가 끝나는 시각(expiresAt)까지 남긴다.
+     *
+     * <p>기본 보관 시간(결과 10분, 소유자 30분)은 인스턴스 수명(1시간)보다 짧다. 그대로 두면 컨테이너는
+     * 살아 있는데 10분 뒤 프록시가 결과를 못 찾아 503, 30분 뒤엔 소유권을 확인 못 해 403을 낸다.
+     * 결과·소유자·사용자 매핑을 같은 시각에 끝내야 "결과는 있는데 주인을 모르는" 상태가 안 생긴다.
+     *
+     * <p>expiresAt이 없거나 이미 지났으면 기본 보관 시간을 그대로 둔다(Judge의 Existing 응답 등).
+     */
+    private void extendToInstanceExpiry(CtfResultMessage result) {
+        Instant until = parseExpiresAt(result.getExpiresAt());
+        if (until == null || !until.isAfter(Instant.now())) {
+            return;
+        }
+        String uuid = result.getUuid();
+        redisTemplate.expireAt(RESULT_KEY_PREFIX + uuid, until);
+        producer.expireOwnerAt(uuid, until);
+
+        Long userId = producer.findUserId(uuid);
+        Long challengeId = producer.findChallengeId(uuid);
+        if (userId != null && challengeId != null) {
+            instanceResultStore.expireUserChallengeMappingAt(userId, challengeId, until);
+        }
+    }
+
+    private Instant parseExpiresAt(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(raw);
+        } catch (DateTimeParseException e) {
+            log.warn("인스턴스 만료 시각을 읽지 못해 기본 보관 시간을 씁니다: expiresAt={}", raw);
+            return null;
+        }
     }
 
     @Override
