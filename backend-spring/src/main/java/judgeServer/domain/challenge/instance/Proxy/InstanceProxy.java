@@ -1,5 +1,6 @@
 package judgeServer.domain.challenge.instance.Proxy;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -17,8 +18,12 @@ import java.util.Map;
 import java.util.Set;
 
 // ctf 서버로 보내는 요청을 전달하는 Proxy
+@Slf4j
 @Component
 public class InstanceProxy {
+
+    // 참가자에게 보이는 502 문구. 예외 메시지에는 내부 호스트명·IP가 담길 수 있어 본문에 넣지 않는다.
+    private static final byte[] BAD_GATEWAY_BODY = "인스턴스에 연결할 수 없습니다.".getBytes(StandardCharsets.UTF_8);
 
     // 인스턴스 서버에 전달하지 않는 값
     private static final Set<String> HOP_BY_HOP = Set.of(
@@ -38,7 +43,14 @@ public class InstanceProxy {
         // 쿼리가 있는지 없는지 확인
         String q = (query != null && !query.isEmpty()) ? "?" + query : "";
         // host, port, path + q로 url을 조합한다.
-        URI uri = URI.create("http://" + host + ":" + port + "/" + path + q);
+        URI uri;
+        try {
+            uri = URI.create("http://" + host + ":" + port + "/" + path + q);
+        } catch (IllegalArgumentException e) {
+            // host에 URI에 못 쓰는 문자가 있거나 경로가 깨진 경우. IOException이 아니라 그냥 두면 500이 된다.
+            log.warn("인스턴스 주소를 만들 수 없습니다: host={}, port={}, reason={}", host, port, e.getMessage());
+            return ResponseEntity.status(502).body(BAD_GATEWAY_BODY);
+        }
         // 해당 도메인으로 요청을 보내고 대기한다. 타임아웃 15초
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(15));
 
@@ -74,8 +86,8 @@ public class InstanceProxy {
             }
             return new ResponseEntity<>(resp.body(), outHeaders, resp.statusCode());
         } catch (IOException e) {
-            return ResponseEntity.status(502)
-                    .body(("인스턴스에 연결할 수 없습니다: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+            log.warn("인스턴스 연결 실패: host={}, port={}, reason={}", host, port, e.toString());
+            return ResponseEntity.status(502).body(BAD_GATEWAY_BODY);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return ResponseEntity.status(502).body("프록시 중단됨".getBytes(StandardCharsets.UTF_8));
