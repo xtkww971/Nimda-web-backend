@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -59,6 +60,21 @@ public class InstanceResultStore extends StreamResultStore<CtfResultMessage> {
     /** userId:challengeId → uuid 매핑을 기록한다. 같은 문제로 다시 요청하면 덮어쓴다. */
     public void saveUserChallengeMapping(Long userId, Long challengeId, String uuid, Duration ttl) {
         redisTemplate.opsForValue().set(userChallengeKey(userId, challengeId), uuid, ttl);
+    }
+
+    /**
+     * 매핑이 없을 때만 기록한다. 생성 버튼을 동시에 두 번 눌러도 uuid가 하나만 남게 한다.
+     *
+     * @return 기록했으면 true, 이미 다른 uuid가 있으면 false
+     */
+    public boolean saveUserChallengeMappingIfAbsent(Long userId, Long challengeId, String uuid, Duration ttl) {
+        return Boolean.TRUE.equals(
+                redisTemplate.opsForValue().setIfAbsent(userChallengeKey(userId, challengeId), uuid, ttl));
+    }
+
+    /** 매핑을 인스턴스가 끝나는 시각까지 남긴다. */
+    public void expireUserChallengeMappingAt(Long userId, Long challengeId, Instant until) {
+        redisTemplate.expireAt(userChallengeKey(userId, challengeId), until);
     }
 
     /** 매핑을 지운다. 발행에 실패했거나 인스턴스를 버릴 때 쓴다. */
