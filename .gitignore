@@ -79,3 +79,4 @@ bruno/**/environments/*.bru
 load-tests/results/
 *.zip
 replacements.txt
+docker-compose-local.yml
