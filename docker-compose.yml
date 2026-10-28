@@ -72,6 +72,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+      # Redis (CTF 요청·결과·소유자 매핑). 운영 redis는 --requirepass라 비밀번호가 필수다.
+      # 컨테이너 안에서 보는 주소라 서비스 이름으로 고정한다(.env의 localhost는 IDE 실행용).
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD}
       # Spring Boot 포트 설정
       - SERVER_PORT=8080
       # AWS S3 설정
@@ -117,6 +122,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+      # Redis (CTF 요청·결과·소유자 매핑). 운영 redis는 --requirepass라 비밀번호가 필수다.
+      # 컨테이너 안에서 보는 주소라 서비스 이름으로 고정한다(.env의 localhost는 IDE 실행용).
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD}
       # Spring Boot 포트 설정
       - SERVER_PORT=8080
       # AWS S3 설정
@@ -166,6 +176,9 @@ volumes:
 # 도커 컨테이너 네트워크 설정
 networks:
   nimda-network:
+    # 이름을 고정해야 Judge Server compose가 external로 이 망에 붙는다.
+    # (기본값은 프로젝트명이 붙어 {프로젝트}_nimda-network가 된다)
+    name: nimda-network
     driver: bridge
   # Judge Server가 --internal로 미리 만든다. 없으면 backend가 뜨지 않는다.
   ctf-instances:
