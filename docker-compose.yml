@@ -56,6 +56,8 @@ services:
       - "127.0.0.1:8081:8080"
     networks:
       - nimda-network
+      # CTF 인스턴스(컨테이너 이름:EXPOSE 포트)로 프록시하려면 같은 망에 있어야 한다.
+      - ctf-instances
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:8080/error" ]
       interval: 10s
@@ -91,6 +93,7 @@ services:
     container_name: backend-green
     networks:
       - nimda-network
+      - ctf-instances
     ports:
       - "127.0.0.1:8082:8080"
     depends_on:
@@ -156,3 +159,6 @@ volumes:
 networks:
   nimda-network:
     driver: bridge
+  # Judge Server가 --internal로 미리 만든다. 없으면 backend가 뜨지 않는다.
+  ctf-instances:
+    external: true
