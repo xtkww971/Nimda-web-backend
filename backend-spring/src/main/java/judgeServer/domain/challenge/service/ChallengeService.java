@@ -34,6 +34,10 @@ public class ChallengeService {
         }
 
         FlagType flagType = request.getFlagType() != null ? request.getFlagType() : FlagType.STATIC;
+        IsolationType isolationType = request.getIsolationType() != null
+                ? request.getIsolationType() : IsolationType.NONE;
+        // Judge가 받지 않는 조합은 저장하지 않는다. 저장되면 풀 수 없는 문제가 된다.
+        ChallengeRules.validate(request.getCategory(), isolationType, flagType);
 
         // DYNAMIC은 사용자마다 플래그가 달라 미리 저장할 값이 없다.
         String flagHash = null;
@@ -53,8 +57,7 @@ public class ChallengeService {
                 .points(request.getPoints() != null ? request.getPoints() : 100)
                 .flagType(flagType)
                 .flagHash(flagHash)
-                .isolationType(request.getIsolationType() != null
-                        ? request.getIsolationType() : IsolationType.NONE)
+                .isolationType(isolationType)
                 .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
                 .build();
 
