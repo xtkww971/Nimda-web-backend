@@ -4,7 +4,6 @@ import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import judgeServer.domain.challenge.entity.Challenge;
-import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.instance.Service.InstanceService;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,13 +46,14 @@ public class InstanceController {
         Long userId = currentUserId(user);
         Challenge challenge = findChallenge(code, user);
 
-        if (challenge.getCategory() != ChallengeCategory.WEB) {
+        // WEB·PWN만 인스턴스를 띄운다. Judge의 분류(instanceCategories)와 같은 기준이다.
+        if (!challenge.getCategory().usesInstance()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 문제는 인스턴스 기능을 지원하지 않습니다.");
         }
 
         String uuid = instanceService.createInstance(challenge, userId);
         if (uuid == null) {
-            // WEB인데 isolationType이 NONE인 경우. 문제 설정이 잘못된 것이다.
+            // WEB·PWN인데 isolationType이 NONE인 경우. 문제 설정이 잘못된 것이다.
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 문제는 인스턴스 기능을 지원하지 않습니다.");
         }
         return ApiResponse.ok(view(uuid, request)).toResponse();
