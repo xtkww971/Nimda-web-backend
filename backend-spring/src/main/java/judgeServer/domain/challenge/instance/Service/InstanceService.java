@@ -1,6 +1,7 @@
 package judgeServer.domain.challenge.instance.Service;
 
 import judgeServer.domain.challenge.entity.Challenge;
+import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.enums.IsolationType;
 import judgeServer.domain.challenge.instance.Config.InstanceProperties;
 import judgeServer.domain.challenge.instance.ObjectStatus.InstanceStatus;
@@ -12,6 +13,7 @@ import judgeServer.domain.challenge.mq.message.CtfResultMessage;
 import judgeServer.domain.challenge.mq.message.RequestStatus;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer;
+import judgeServer.domain.challenge.service.ChallengeRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -54,6 +56,9 @@ public class InstanceService {
             // NONE은 다운로드만 하는 문제라 인스턴스가 없다.
             return null;
         }
+        // 규칙 이전에 저장된 잘못된 조합(PWN+SHARED, SHARED+DYNAMIC)은 발행하지 않는다.
+        // 그냥 두면 Judge가 FAILED를 돌려주거나, 메시지를 만들다 예외가 나서 500이 된다.
+        ChallengeRules.validate(challenge.getCategory(), challenge.getIsolationType(), challenge.getFlagType());
 
         Optional<String> mapped = resultStore.findUuid(userId, challenge.getId());
         if (mapped.isPresent()) {
@@ -101,8 +106,12 @@ public class InstanceService {
     }
 
     /**
-     * 참가자에게 보여줄 인스턴스 상태. host/port(내부 컨테이너 이름·EXPOSE 포트)는 싣지 않는다 —
-     * 참가자는 accessUrl로만 접속한다.
+     * 참가자에게 보여줄 인스턴스 상태. 접속 방법은 문제 유형마다 다르다.
+     *
+     * <ul>
+     *   <li>WEB: {@code accessUrl}만. 결과의 host/port는 내부 네트워크 alias·EXPOSE 포트라 내보내지 않는다.</li>
+     *   <li>PWN: {@code host}·{@code port}. Judge가 준 공개 호스트와 포트 풀 포트로, 참가자가 nc로 직접 붙는다.</li>
+     * </ul>
      *
      * @param scheme     사용자가 플랫폼에 접속한 스킴 (accessUrl용)
      * @param serverPort 사용자가 플랫폼에 접속한 포트 (accessUrl용)
@@ -115,7 +124,12 @@ public class InstanceService {
         view.put("uuid", uuid);
         view.put("status", state.name());
         if (state == Status.READY) {
-            view.put("accessUrl", accessUrl(result, scheme, serverPort));
+            if (producer.findChallengeCategory(uuid) == ChallengeCategory.PWN) {
+                view.put("host", result.getHost());
+                view.put("port", result.getPort());
+            } else {
+                view.put("accessUrl", accessUrl(result, scheme, serverPort));
+            }
             view.put("expiresAt", result.getExpiresAt());
         } else if (state == Status.FAILED) {
             // 생성 실패는 Judge가 준 사유를 그대로 전한다 (빌드 실패, 이미지 없음 등).
