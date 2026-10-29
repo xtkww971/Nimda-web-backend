@@ -7,6 +7,7 @@ import judgeServer.domain.challenge.mq.message.CtfResultMessage;
 import judgeServer.domain.challenge.mq.message.RequestStatus;
 import judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.challenge.service.ChallengeRules;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,11 +46,18 @@ public class ChallengeDownloadController {
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !isAdmin(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
+        // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
+        // 다운로드 링크 대신 컨테이너를 띄운다(누를 때마다 새 uuid라 하나씩 쌓인다).
+        if (challenge.getCategory().usesInstance()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인스턴스 문제는 첨부파일 다운로드를 지원하지 않습니다.");
+        }
         if (challenge.getAttachmentKey() == null || challenge.getAttachmentKey().isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일이 없는 문제입니다.");
         }
 
         Long userId = requireUserId(user);
+        // 규칙 이전에 저장된 잘못된 조합(정적 문제인데 DYNAMIC 등)은 발행하지 않는다.
+        ChallengeRules.validate(challenge.getCategory(), challenge.getIsolationType(), challenge.getFlagType());
 
         // redis 캐싱 확인
         Optional<ChallengeDownloadUrlCache.CachedUrl> cached = urlCache.find(code);
