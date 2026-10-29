@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.instance.Config.InstanceProperties;
 import judgeServer.domain.challenge.instance.Repository.InstanceResultStore;
 import judgeServer.domain.challenge.mq.message.CtfResultMessage;
@@ -65,6 +66,14 @@ public class SubdomainInstanceProxyFilter extends OncePerRequestFilter {
         }
         // UUID 추출
         String token = tokenOpt.get();
+        // 프록시는 WEB 인스턴스만 넘긴다. PWN은 공개 host:port로 직접 붙고, 다운로드 uuid는 접속 대상이 없다.
+        // 그냥 두면 backend가 공인 호스트의 pwn 포트로 HTTP 요청을 보낸다.
+        // (category가 없는 예전 매핑은 WEB만 발행하던 때라 그대로 둔다.)
+        ChallengeCategory category = producer.findChallengeCategory(token);
+        if (category != null && category != ChallengeCategory.WEB) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "인스턴스를 찾을 수 없습니다.");
+            return;
+        }
         // UUID : instance로 매칭되는 결과가 있는지 확인한다.
         CtfResultMessage instance = resultStore.find(token).orElse(null);
         // 매칭되는 결과가 존재하지 않음 == 최초 실행
