@@ -3,6 +3,7 @@ package judgeServer.domain.challenge.mq.producer;
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.entity.Challenge;
+import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.mq.message.CtfRequestMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +29,17 @@ public class RedisCtfRequestProducer implements CtfRequestProducer {
 
     @Override
     public String request(Challenge challenge, Long userId, String uuid) {
+        // 메시지를 먼저 만든다. 허용되지 않는 조합이면 여기서 예외가 나고, 매핑을 남기지 않는다.
+        Map<String, String> fields = CtfRequestMessage.of(challenge, uuid).toStreamFields();
+
         // 매핑을 먼저 남긴다. 발행 뒤에 남기면 그 사이에 결과가 도착해 매핑을 못 찾을 수 있다.
         Map<String, String> owner = new LinkedHashMap<>();
         owner.put("userId", String.valueOf(userId));
         owner.put("challengeCode", challenge.getCode());
         // 결과를 받았을 때 userId:challengeId → uuid 매핑을 인스턴스 수명까지 늘리려면 challengeId가 필요하다.
         owner.put("challengeId", String.valueOf(challenge.getId()));
+        // 같은 uuid라도 WEB은 프록시로, PWN은 공개 host:port로 붙는다. 결과에는 category가 없어서 여기 남긴다.
+        owner.put("challengeCategory", challenge.getCategory().name());
         String ownerKey = OWNER_KEY_PREFIX + uuid;
         redisTemplate.opsForHash().putAll(ownerKey, owner);
         redisTemplate.expire(ownerKey, ttlProperties.getOwner());
@@ -46,9 +52,7 @@ public class RedisCtfRequestProducer implements CtfRequestProducer {
                 flagType
                 }
          */
-         RecordId recordId = redisTemplate.opsForStream().add(
-                queueProperties.getStreamKey(),
-                CtfRequestMessage.of(challenge, uuid).toStreamFields());
+         RecordId recordId = redisTemplate.opsForStream().add(queueProperties.getStreamKey(), fields);
 
         log.info("CTF 요청 발행: uuid={}, challengeCode={}, category={}, stream={}, recordId={}",
                 uuid, challenge.getCode(), challenge.getCategory(),
@@ -87,6 +91,20 @@ public class RedisCtfRequestProducer implements CtfRequestProducer {
             return Long.valueOf(raw.toString());
         } catch (NumberFormatException e) {
             log.warn("요청 매핑의 challengeId를 읽지 못했습니다: uuid={}, raw={}", uuid, raw);
+            return null;
+        }
+    }
+
+    /** 이 uuid가 어느 유형(category) 문제의 요청이었는지. 매핑이 만료됐거나 예전 형식이면 null. */
+    public ChallengeCategory findChallengeCategory(String uuid) {
+        Object raw = redisTemplate.opsForHash().get(OWNER_KEY_PREFIX + uuid, "challengeCategory");
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return ChallengeCategory.valueOf(raw.toString());
+        } catch (IllegalArgumentException e) {
+            log.warn("요청 매핑의 challengeCategory를 읽지 못했습니다: uuid={}, raw={}", uuid, raw);
             return null;
         }
     }
