@@ -1,11 +1,17 @@
 package com.nimda.cite.user.service;
 
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.user.AdminUserErrorCode;
+import com.nimda.cite.config.CheckConfig;
+import com.nimda.cite.user.dto.adminuser.AdminUserDetailResponseDTO;
+import com.nimda.cite.user.dto.adminuser.AdminUserListResponseDTO;
+import com.nimda.cite.user.dto.UserSuggestionResponseDTO;
 import com.nimda.cite.user.entity.Authority;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.AuthorityRepository;
 import com.nimda.cite.user.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,62 +31,81 @@ import java.util.stream.Collectors;
  * - 일반 사용자 기능: UserService
  * - 관리자 기능: AdminUserService
  */
+
+// npe check config 공통 class생성시 각 메서드 별로 parameter를 최상단에 검사
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AdminUserService {
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private AuthorityRepository authorityRepository;
+    private final UserRepository userRepository;
+    private final AuthorityRepository authorityRepository;
 
     /**
      * 모든 사용자 조회
      */
-    @Transactional(readOnly = true)
-    public List<User> findAll() {
-        return userRepository.findAll();
+    public List<AdminUserListResponseDTO> findAll() {
+        return userRepository.findAll()
+                .stream().map(AdminUserListResponseDTO::from).toList();
     }
 
     /**
      * ID로 사용자 조회
      */
-    @Transactional(readOnly = true)
-    public User findById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+    public AdminUserDetailResponseDTO findById(Long userId) {
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
+
+        return AdminUserDetailResponseDTO.from(userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND)));
     }
 
     /**
      * 승인 상태로 사용자 목록 조회
      */
-    @Transactional(readOnly = true)
-    public List<User> findByStatus(ApprovalStatus status) {
-        return userRepository.findByStatus(status);
+    public List<AdminUserListResponseDTO> findByStatus(ApprovalStatus status) {
+        CheckConfig.npeCheck(status, "status");
+
+        return userRepository.findByStatus(status)
+                .stream()
+                .map(AdminUserListResponseDTO::from)
+                .toList();
     }
 
     /**
      * 사용자 승인
      * - status를 APPROVED로 변경
      * - ROLE_USER 권한 부여
+     *
+     *
+     * 문제점
+     *  - user.Authorities 필드는 지연탐색을 통해 필요에 따라 탐색이 발생함
+     *      -> userRole을 통해 Authority 마스터 테이블에 해당 권한(ROLE_USER)이 존재하는지 파악 : (authority_id, authority_name)반환
+     *      -> user.getAUthorities().contains()를 통해 지연탐색 시작
+     *      -> 이때 user에게 이미 ROLE_USER가 존재한다고 가정하에, 탐색을 하게 되면 찾는 row가 위 마스터 테이블에서 찾는 값과 동일함
+     *      -> hibernate는 default설정이 1차 캐시를 통해 동일한 값은 값은 객체를 가르키도록 함
+     *      -> 따라서 contains()를 통해 찾은 row은 마스터 테이블에서 찾은 row와 동일 객체를 가르킴
+     *      -> set의 contains()는 내부적으로 원소를 순회하며 equals()를 호출
+     *      -> set의 주체인 Authority엔티티 내부에서 equals를 따로 오버라이딩하지 않아 두 값을 비교하는 것이 아닌, objects.equals()를 호출하여 두 객체가 같은건지 파악
+     *      -> 지금은 1차 캐시로 인해 두 객체가 같아 통과되지만, 추후에 같은 세션의 map을 안거치게 되는 모든 경우에서 에러 가능
+     *      -> 따라서 object.equals()를 유도하는 contains() 대신 authority_name을 통해 직접 비교
      */
     @Transactional
-    public User approveUser(Long userId) {
+    public AdminUserDetailResponseDTO approveUser(Long userId) {
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
 
         // status를 APPROVED로 변경
-        user.setStatus(ApprovalStatus.APPROVED);
+        user.changeStatus(ApprovalStatus.APPROVED);
 
         // ROLE_USER 권한 부여 (이미 권한이 있으면 추가하지 않음)
         Authority userRole = authorityRepository.findByAuthorityName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("ROLE_USER 권한을 찾을 수 없습니다."));
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_ROLE_NOT_FOUND));
 
-        if (!user.getAuthorities().contains(userRole)) {
-            user.getAuthorities().add(userRole);
-        }
+        user.addAuthority(userRole);
 
-        return userRepository.save(user);
+        return AdminUserDetailResponseDTO.from(user);
     }
 
     /**
@@ -88,20 +113,21 @@ public class AdminUserService {
      * - status를 REJECTED로 변경
      */
     @Transactional
-    public User rejectUser(Long userId) {
+    public AdminUserDetailResponseDTO rejectUser(Long userId) {
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
 
         // status를 REJECTED로 변경
-        user.setStatus(ApprovalStatus.REJECTED);
+        user.changeStatus(ApprovalStatus.REJECTED);
 
-        return userRepository.save(user);
+        return AdminUserDetailResponseDTO.from(user);
     }
 
     /**
      * 서버에 등록된 권한 목록 조회
      */
-    @Transactional(readOnly = true)
     public List<String> findAllRoleNames() {
         return authorityRepository.findAll().stream()
                 .map(Authority::getAuthorityName)
@@ -113,65 +139,61 @@ public class AdminUserService {
      * 사용자에게 권한 1개를 추가 부여한다. (기존 권한은 유지)
      */
     @Transactional
-    public User grantRole(Long userId, String roleName) {
-        if (roleName == null || roleName.isBlank()) {
-            throw new RuntimeException("부여할 권한이 비어 있습니다.");
-        }
+    public AdminUserDetailResponseDTO grantRole(Long id, String roleName) {
+        CheckConfig.npeAndNegativeCheck(id, "id");
+        CheckConfig.npeAndBlankCheck(roleName, "roleName");
 
         // 1. 권한 이름 정규화 (ROLE_ 접두사 처리)
         String normalized = roleName.trim().toUpperCase();
         if (!normalized.startsWith("ROLE_")) {
             normalized = "ROLE_" + normalized;
         }
-        final String normalizedRole = normalized;
+
+        Authority authority = authorityRepository.findByAuthorityName(normalized)
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST));
 
         // 2. 사용자 및 권한 존재 여부 확인
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다. ID: " + userId));
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
 
-        // final 변수로 선언하여 람다식 내부에서 안전하게 사용
-        final String finalRoleName = normalizedRole;
-        Authority authority = authorityRepository.findByAuthorityName(finalRoleName)
-                .orElseThrow(() -> new RuntimeException("서버에 존재하지 않는 권한입니다: " + finalRoleName));
+        // 3. 권한 추가(중복 체크가 내부 메서드에 구현되어 있음)
+        user.addAuthority(authority);
 
-        // 3. 중복 체크 및 권한 추가
-        // 주의: user.getAuthorities()가 Security 메서드라면 엔티티의 실제 컬렉션 필드(예: user.getRoles())를 사용하는 것이 좋습니다.
-        boolean alreadyHasRole = user.getAuthorities().stream()
-                .anyMatch(a -> finalRoleName.equals(a.getAuthorityName()));
-
-        if (!alreadyHasRole) {
-            user.getAuthorities().add(authority);
-            // JPA의 변경 감지(Dirty Checking) 기능 덕분에 @Transactional이 있으면 save를 명시하지 않아도 되지만, 
-            // 명시적 가독성을 위해 남겨둘 수 있습니다.
-            return userRepository.save(user);
-        }
-
-        return user;
+        return AdminUserDetailResponseDTO.from(user);
     }
 
     /**
      * 사용자에게서 권한 1개를 제거한다.
      */
     @Transactional
-    public User revokeRole(Long userId, String roleName) {
-        if (roleName == null || roleName.isBlank()) {
-            throw new RuntimeException("제거할 권한이 비어 있습니다.");
-        }
+    public AdminUserDetailResponseDTO revokeRole(Long userId, String roleName) {
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
+        CheckConfig.npeAndBlankCheck(roleName, "roleName");
 
         String normalized = roleName.trim().toUpperCase();
         if (!normalized.startsWith("ROLE_")) {
             normalized = "ROLE_" + normalized;
         }
-        final String normalizedRole = normalized;
+
+        Authority authority = authorityRepository.findByAuthorityName(normalized)
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다. ID: " + userId));
+                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
 
-        boolean removed = user.getAuthorities().removeIf(a -> normalizedRole.equals(a.getAuthorityName()));
-        if (!removed) {
-            throw new RuntimeException("사용자에게 해당 권한이 없습니다: " + normalizedRole);
-        }
+        user.removeAuthority(authority);
 
-        return userRepository.save(user);
+        return AdminUserDetailResponseDTO.from(user);
+    }
+
+    public List<UserSuggestionResponseDTO> findUserSuggestions(){
+        List<User> users = userRepository.findAll();
+
+        return users.stream()
+                .map(user -> UserSuggestionResponseDTO.builder()
+                        .studentNum(user.getStudentNum())
+                        .name(user.getName())
+                        .build())
+                .toList();
     }
 }

@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.profiledecoration.ownership;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.Entity;
@@ -19,7 +20,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "user_profile_decorations",
+        name = TableNames.userProfileDecorationsTable,
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "profile_decoration_id"})
 )
 @Getter

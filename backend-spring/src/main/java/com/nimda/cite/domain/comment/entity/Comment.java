@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.comment.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.nimda.cite.domain.board.entity.Board;
 import com.nimda.cite.domain.comment.enums.STATUS;
@@ -13,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "comments")
+@Table(name = TableNames.commentsTable)
 @Getter
 @Setter
 @Builder

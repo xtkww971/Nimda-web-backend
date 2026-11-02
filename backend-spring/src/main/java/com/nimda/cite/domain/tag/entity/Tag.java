@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.tag.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.domain.board.entity.Category;
 import jakarta.persistence.*;
 import lombok.*;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(name = "tags")
+@Table(name = TableNames.tagsTable)
 @Builder
 @AllArgsConstructor
 public class Tag {

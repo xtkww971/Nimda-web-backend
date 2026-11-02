@@ -1,5 +1,7 @@
 package com.nimda.cite.domain.notification.service;
 
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.NotificationErrorCode;
 import com.nimda.cite.domain.alarm.service.AlarmService;
 import com.nimda.cite.domain.notification.entity.Notification;
 import com.nimda.cite.domain.notification.repositroy.NotificationRepositroy;
@@ -16,7 +18,7 @@ public class NotificationService {
     @Transactional
     public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("알림이 존재하지 않습니다."));
+                .orElseThrow(() -> new NotFoundException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
         notification.setIsRead(true);
     }
 

@@ -1,11 +1,12 @@
 package com.nimda.cite.domain.point.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Table(name = "point_details")
+@Table(name = TableNames.pointDetailsTable)
 @Entity
 @Getter
 @Builder

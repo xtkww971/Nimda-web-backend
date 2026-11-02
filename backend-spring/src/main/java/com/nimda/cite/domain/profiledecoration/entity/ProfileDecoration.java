@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.profiledecoration.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -7,7 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "profile_decorations")
+@Table(name = TableNames.profileDecorationsTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProfileDecoration extends BaseTimeEntity {

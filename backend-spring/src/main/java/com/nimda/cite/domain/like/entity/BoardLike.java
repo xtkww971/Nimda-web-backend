@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.like.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.domain.board.entity.Board;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.*;
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
-@Table(name = "board_like",
+@Table(name = TableNames.boardLikeTable,
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"user_id", "board_id"}) // 한 사용자가 한 게시글에 중복 좋아요 방지
         }

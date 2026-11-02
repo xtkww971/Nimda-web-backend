@@ -2,6 +2,7 @@ package com.nimda.cite.domain.tag.controller;
 
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.domain.tag.dto.TagRequest;
 import com.nimda.cite.domain.tag.dto.TagResponse;
 import com.nimda.cite.domain.tag.entity.Tag;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequestMapping("/api/cite/tag")
+@RequestMapping(UrlNames.tagUrl)
 @RestController
 @RequiredArgsConstructor
 public class TagController {
@@ -21,7 +22,7 @@ public class TagController {
     private final TagService tagService;
 
     // 태그 추가
-    @PostMapping("/add-tag")
+    @PostMapping(UrlNames.addTagUrl)
     public ResponseEntity<?> addTag(@RequestBody TagRequest req) {
         String name = req.getName();
         Integer value = req.getSortValue();
@@ -33,7 +34,7 @@ public class TagController {
     }
 
     // 모든 태그 조회
-    @GetMapping
+    @GetMapping(UrlNames.getAllTagsUrl)
     public ResponseEntity<?> getAllTags() {
         List<TagResponse> dto = tagService.getAllTags().stream().map(TagResponse::from)
                 .toList();
@@ -41,7 +42,7 @@ public class TagController {
     }
 
     // 카테고리 id로 태그 조회
-    @GetMapping("/{categoryId}")
+    @GetMapping(UrlNames.searchTagUrl)
     public ResponseEntity<?> searchTag(@PathVariable Long categoryId) {
         List<TagResponse> dto = tagService.searchTag(categoryId)
                 .stream().map(TagResponse::from).toList();
@@ -50,7 +51,7 @@ public class TagController {
     }
 
     // 태그 삭제
-    @DeleteMapping("/{tagId}")
+    @DeleteMapping(UrlNames.deleteTagByIdUrl)
     public ResponseEntity<?> deleteTag(@PathVariable Long tagId) {
         tagService.deleteTag(tagId);
 
@@ -58,7 +59,7 @@ public class TagController {
     }
 
     // 태그 정보 수정
-    @PatchMapping("/{tagId}")
+    @PatchMapping(UrlNames.updateTagNameUrl)
     public ResponseEntity<?> updateTagName(@RequestBody TagRequest requestDto, @PathVariable
                                            Long tagId) {
         String newName = requestDto.getName();

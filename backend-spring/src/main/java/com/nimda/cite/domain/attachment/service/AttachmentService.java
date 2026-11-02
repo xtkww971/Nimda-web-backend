@@ -1,11 +1,21 @@
 package com.nimda.cite.domain.attachment.service;
 
+import com.nimda.cite.common.exception.ExternalServiceException;
+import com.nimda.cite.common.exception.InvalidStateException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.errorcode.domain.AttachmentErrorCode;
+import com.nimda.cite.config.CheckConfig;
 import com.nimda.cite.domain.attachment.dto.AttachmentResponseDto;
 import com.nimda.cite.domain.attachment.entity.Attachment;
 import com.nimda.cite.domain.attachment.repository.AttachmentRepository;
 import com.nimda.cite.domain.attachment.store.FileStore;
+import com.nimda.cite.domain.attachment.store.S3FileStore;
+import com.nimda.cite.common.s3.S3Service;
 import com.nimda.cite.domain.board.constants.CategoryConstants;
 import com.nimda.cite.common.image.ImageSanitizer;
+import com.nimda.cite.user.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,30 +54,41 @@ public class AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
     private final FileStore fileStore;
+    private final S3Service s3Service;
 
     /**
      * [핵심 기능 1] 파일 업로드 및 DB 기록
      * - 유저 정보, 카테고리, 게시글 정보를 모두 받아 연결함
      */
-    public Long uploadFile(MultipartFile file, Long boardId, Long categoryId, Long userId) {
-        if (file.isEmpty()) {
-            throw new RuntimeException("업로드할 파일이 없습니다.");
+    public AttachmentResponseDto uploadFile(CustomUserDetails userDetails, MultipartFile file, Long boardId, Long categoryId) {
+        CheckConfig.npeCheck(file, "file");
+        CheckConfig.npeAndNegativeCheck(categoryId, "categoryId");
+        CheckConfig.npeCheck(userDetails, "userDetails");
+
+        // boardId는 게시글 작성 전 업로드에서는 없을 수 있으므로 값이 있을 때만 검증
+        if (boardId != null) {
+            CheckConfig.npeAndNegativeCheck(boardId, "boardId");
         }
+        if (file.isEmpty()) {
+            throw new NotAllowFormException(AttachmentErrorCode.UPLOAD_FILE_NOT_FOUND);
+        }
+
+        // 0. userId 가져오기
+        Long userId = userDetails.getUser().getId();
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
 
         // 1. 원본 파일명 및 확장자 추출
         String originName = file.getOriginalFilename();
         String ext = extractExt(originName);
-        if (ext.isBlank()) {
-            throw new RuntimeException("파일 확장자가 없습니다. 업로드를 허용하지 않습니다.");
-        }
 
-        // 2. 허용된 확장자 검증 (화이트리스트)
-        if (!ALLOWED_EXTENSIONS.contains(ext.toLowerCase())) {
-            throw new RuntimeException("허용되지 않는 파일 형식입니다: " + ext);
+        // 2. 허용된 확장자 검증 (화이트리스트, 확장자가 없으면 빈 문자열이므로 여기서 걸러짐)
+        if(!isAllowedExtension(ext)){
+            throw new NotAllowFormException(AttachmentErrorCode.FILE_FORM_NOT_ALLOW);
         }
 
         // 3. 이미지 파일이면 재인코딩하여 메타데이터/삽입 코드 파괴
         long fileSize = file.getSize();
+
         if (ImageSanitizer.isImageExtension(ext)) {
             try {
                 byte[] sanitized = ImageSanitizer.reEncode(file, ext);
@@ -81,9 +102,9 @@ public class AttachmentService {
                         originName, storedName, filepath, ext, fileSize,
                         boardId, categoryId, userId
                 );
-                return attachmentRepository.save(attachment).getId();
+                return AttachmentResponseDto.from(attachmentRepository.save(attachment));
             } catch (IOException e) {
-                throw new RuntimeException("이미지 처리에 실패했습니다: " + e.getMessage());
+                throw new ExternalServiceException(AttachmentErrorCode.IMAGE_PROCESSING_FAILED);
             }
         }
 
@@ -96,16 +117,17 @@ public class AttachmentService {
                 boardId, categoryId, userId
         );
 
-        return attachmentRepository.save(attachment).getId();
+        return AttachmentResponseDto.from(attachmentRepository.save(attachment));
     }
 
     /**
      * 엔티티 조회 (다운로드 등에서 메타정보 필요 시 사용)
      */
     @Transactional(readOnly = true)
-    public Attachment getAttachment(Long attachmentId) {
-        return attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new RuntimeException("파일이 존재하지 않습니다."));
+    public AttachmentResponseDto getAttachment(Long attachmentId) {
+        Attachment attachment = findAttachment(attachmentId);
+
+        return AttachmentResponseDto.from(attachment);
     }
 
     /**
@@ -114,8 +136,7 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public AttachmentResponseDto getFile(Long attachmentId) {
-        Attachment attachment = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new RuntimeException("파일이 존재하지 않습니다."));
+        Attachment attachment = findAttachment(attachmentId);
 
         // 카테고리 ID를 활용한 정책 분기 (상수로 관리해 ID 변경 시 한 곳만 수정)
         String disposition = "attachment"; // 기본값: 다운로드
@@ -145,12 +166,16 @@ public class AttachmentService {
      * [핵심 기능 4] 유저별 선택 삭제 (보안 및 물리 파일 삭제)
      */
     public void deleteUserFiles(Long userId, List<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            throw new NotAllowFormException(AttachmentErrorCode.FILE_IDS_REQUIRED);
+        }
+
         List<Attachment> files = attachmentRepository.findAllById(fileIds);
 
         for (Attachment file : files) {
             // 보안 검증: 요청 유저가 파일 소유자인지 확인
             if (!file.getUserId().equals(userId)) {
-                throw new RuntimeException("삭제 권한이 없는 파일이 포함되어 있습니다: " + file.getOriginFilename());
+                throw new NotIncludeRoleException(AttachmentErrorCode.FILE_ROLE_NOT_EXIST);
             }
 
             deletePhysicalFile(file);
@@ -164,15 +189,14 @@ public class AttachmentService {
      * 확장자 추출 헬퍼 메서드
      * - 파일명이 없거나 점이 없으면 빈 문자열 반환 (NPE 방지)
      */
-    private String extractExt(String originalFilename) {
-        if (originalFilename == null || originalFilename.isBlank()) {
+    private String extractExt(String originalFileName) {
+        CheckConfig.npeAndBlankCheck(originalFileName, "originalFileName");
+
+        int pos = originalFileName.lastIndexOf(".");
+        if (pos < 0 || pos == originalFileName.length() - 1) {
             return "";
         }
-        int pos = originalFilename.lastIndexOf(".");
-        if (pos < 0 || pos == originalFilename.length() - 1) {
-            return "";
-        }
-        return originalFilename.substring(pos + 1);
+        return originalFileName.substring(pos + 1);
     }
 
     /**
@@ -186,20 +210,16 @@ public class AttachmentService {
                                Long categoryId,
                                Long userId) {
         if (key == null || key.isBlank()) {
-            throw new RuntimeException("S3 key가 필요합니다.");
+            throw new NotAllowFormException(AttachmentErrorCode.S3_KEY_INNEED);
         }
-
         // key에서 실제 저장 파일명 부분만 추출 (예: boards/files/uuid_name.png -> uuid_name.png)
         String storedFilename = extractStoredFilenameFromKey(key);
 
         // 확장자는 원본 파일명 기준으로 우선 추출, 없으면 storedFilename 기준
         String nameForExt = originFilename != null && !originFilename.isBlank() ? originFilename : storedFilename;
         String ext = extractExt(nameForExt);
-        if (ext.isBlank()) {
-            throw new RuntimeException("파일 확장자가 없습니다. 업로드를 허용하지 않습니다.");
-        }
-        if (!ALLOWED_EXTENSIONS.contains(ext.toLowerCase())) {
-            throw new RuntimeException("허용되지 않는 파일 형식입니다: " + ext);
+        if (!isAllowedExtension(ext)) {
+            throw new NotAllowFormException(AttachmentErrorCode.FILE_FORM_NOT_ALLOW);
         }
 
         String safeOrigin = (originFilename == null || originFilename.isBlank()) ? storedFilename : originFilename;
@@ -222,23 +242,28 @@ public class AttachmentService {
      * 글 저장 직후: presigned로 등록된 첨부( boardId 미설정 )를 해당 게시글에 연결.
      */
     public void linkAttachmentsToBoard(List<Long> attachmentIds, Long boardId, Long categoryId, Long userId) {
-        if (attachmentIds == null || attachmentIds.isEmpty() || boardId == null) {
+        // 첨부 없이 작성하는 게시글도 있으므로 빈 목록은 예외가 아니라 연결할 대상이 없는 것으로 처리
+        if (attachmentIds == null || attachmentIds.isEmpty()) {
             return;
         }
+        CheckConfig.npeAndNegativeCheck(boardId, "boardId");
+        CheckConfig.npeAndNegativeCheck(categoryId, "categoryId");
+        CheckConfig.npeAndNegativeCheck(userId, "userId");
+
         for (Long aid : attachmentIds) {
             if (aid == null) {
                 continue;
             }
             Attachment a = attachmentRepository.findById(aid)
-                    .orElseThrow(() -> new RuntimeException("첨부를 찾을 수 없습니다: " + aid));
+                    .orElseThrow(() -> new NotFoundException(AttachmentErrorCode.ATTACHMENT_NOT_FOUND));
             if (!a.getUserId().equals(userId)) {
-                throw new RuntimeException("첨부 소유자만 글에 연결할 수 있습니다: " + aid);
+                throw new NotIncludeRoleException(AttachmentErrorCode.ATTACHMENT_LINK_FORBIDDEN);
             }
             if (a.getBoardId() != null && !a.getBoardId().equals(boardId)) {
-                throw new RuntimeException("이미 다른 게시글에 연결된 첨부입니다: " + aid);
+                throw new InvalidStateException(AttachmentErrorCode.ATTACHMENT_ALREADY_LINKED);
             }
             if (categoryId != null && a.getCategoryId() != null && !a.getCategoryId().equals(categoryId)) {
-                throw new RuntimeException("첨부 카테고리가 게시글 카테고리와 일치하지 않습니다: " + aid);
+                throw new NotAllowFormException(AttachmentErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
             }
             a.linkToBoard(boardId);
         }
@@ -264,7 +289,7 @@ public class AttachmentService {
         for (Attachment a : current) {
             if (!wanted.contains(a.getId())) {
                 if (!a.getUserId().equals(userId)) {
-                    throw new RuntimeException("다른 사용자가 올린 첨부는 제거할 수 없습니다: " + a.getId());
+                    throw new NotIncludeRoleException(AttachmentErrorCode.ATTACHMENT_REMOVE_FORBIDDEN);
                 }
                 deletePhysicalFile(a);
                 attachmentRepository.delete(a);
@@ -273,15 +298,15 @@ public class AttachmentService {
 
         for (Long aid : wanted) {
             Attachment a = attachmentRepository.findById(aid)
-                    .orElseThrow(() -> new RuntimeException("첨부를 찾을 수 없습니다: " + aid));
+                    .orElseThrow(() -> new NotFoundException(AttachmentErrorCode.ATTACHMENT_NOT_FOUND));
             if (!a.getUserId().equals(userId)) {
-                throw new RuntimeException("첨부 소유자만 게시글에 포함할 수 있습니다: " + aid);
+                throw new NotIncludeRoleException(AttachmentErrorCode.ATTACHMENT_LINK_FORBIDDEN);
             }
             if (a.getBoardId() != null && !a.getBoardId().equals(boardId)) {
-                throw new RuntimeException("이미 다른 게시글에 연결된 첨부입니다: " + aid);
+                throw new InvalidStateException(AttachmentErrorCode.ATTACHMENT_ALREADY_LINKED);
             }
             if (categoryId != null && a.getCategoryId() != null && !a.getCategoryId().equals(categoryId)) {
-                throw new RuntimeException("첨부 카테고리가 게시글 카테고리와 일치하지 않습니다: " + aid);
+                throw new NotAllowFormException(AttachmentErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
             }
             if (a.getBoardId() == null) {
                 a.linkToBoard(boardId);
@@ -313,7 +338,7 @@ public class AttachmentService {
         List<Attachment> imageAttachments = attachmentIds.stream()
                 .filter(id -> id != null)
                 .map(id -> attachmentRepository.findById(id)
-                        .orElseThrow(() -> new RuntimeException("첨부를 찾을 수 없습니다: " + id)))
+                        .orElseThrow(() -> new NotFoundException(AttachmentErrorCode.ATTACHMENT_NOT_FOUND)))
                 .filter(this::isImage)
                 .sorted((left, right) -> left.getId().compareTo(right.getId()))
                 .toList();
@@ -329,7 +354,7 @@ public class AttachmentService {
         return imageAttachments.stream()
                 .filter(attachment -> attachment.getId().equals(requestedThumbnailAttachmentId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("썸네일은 첨부된 이미지 중에서 선택해야 합니다."))
+                .orElseThrow(() -> new NotAllowFormException(AttachmentErrorCode.INVALID_THUMBNAIL))
                 .getId();
     }
 
@@ -358,6 +383,41 @@ public class AttachmentService {
             deletePhysicalFile(a);
             attachmentRepository.delete(a);
         }
+    }
+
+    /**
+     * 로컬 리소스를 열 수 없을 때 사용할 S3 Presigned GET URL 생성
+     * - PDF는 브라우저 내 스크립트 실행 방지를 위해 Content-Disposition: attachment 강제
+     */
+    @Transactional(readOnly = true)
+    public String createPresignedDownloadUrl(AttachmentResponseDto attachment) {
+        if (s3Service == null || attachment.getFilepath() == null) {
+            throw new NotFoundException(AttachmentErrorCode.FILE_NOT_FOUND);
+        }
+
+        String disposition = "pdf".equalsIgnoreCase(attachment.getExtension()) ? "attachment" : null;
+        String presignedUrl = s3Service.createPresignedGetUrl(attachment.getFilepath(), 10, disposition);
+        if (presignedUrl == null) {
+            throw new NotFoundException(AttachmentErrorCode.FILE_NOT_FOUND);
+        }
+        return presignedUrl;
+    }
+
+    /**
+     * [S3] 업로드용 Presigned URL 발급
+     * - S3 저장소를 사용하지 않는 환경에서는 사용할 수 없다.
+     */
+    @Transactional(readOnly = true)
+    public S3Service.PresignedUpload createPresignedUpload(String type, String fileName) {
+        if (!(fileStore instanceof S3FileStore s3FileStore)) {
+            throw new ExternalServiceException(AttachmentErrorCode.FILE_STORAGE_UNAVAILABLE);
+        }
+        return s3FileStore.getPresignedUpload(type, fileName);
+    }
+
+    private Attachment findAttachment(Long attachmentId) {
+        return attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new NotFoundException(AttachmentErrorCode.ATTACHMENT_NOT_FOUND));
     }
 
     private void deletePhysicalFile(Attachment file) {

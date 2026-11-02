@@ -1,6 +1,7 @@
 package com.nimda.cite.common.interceptor;
 
-import com.nimda.cite.common.exception.error.VersionMismatchException;
+import com.nimda.cite.common.exception.VersionMismatchException;
+import com.nimda.cite.common.exception.errorcode.common.CommonErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +30,7 @@ public class VersionCheckInterceptor implements HandlerInterceptor {
         if (clientVersion == null || !clientVersion.equals(currentAppVersion)) {
 
             // 6. 조금 전에 우리가 힘겹게 만든 바로 그 커스텀 예외를 여기서 사정없이 던집니다!
-            throw new VersionMismatchException("앱 버전이 일치하지 않습니다. 최신 버전으로 업데이트 해주세요.");
+            throw new VersionMismatchException(CommonErrorCode.VERSION_MISMATCH);
         }
 
         return true;

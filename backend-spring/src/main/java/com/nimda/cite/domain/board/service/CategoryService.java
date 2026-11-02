@@ -1,5 +1,13 @@
 package com.nimda.cite.domain.board.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.InvalidStateException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.domain.CategoryErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.domain.board.dto.CategoryCreateDTO;
 import com.nimda.cite.domain.board.dto.CategorySortOrderDTO;
 import com.nimda.cite.domain.board.dto.CategoryUpdateDTO;
@@ -8,10 +16,8 @@ import com.nimda.cite.domain.board.repository.BoardRepository;
 import com.nimda.cite.domain.board.repository.CategoryRepository;
 import com.nimda.cite.user.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.List;
@@ -61,12 +67,12 @@ public class CategoryService {
      * 
      * @param slug 카테고리 slug
      * @return Category (활성화된 카테고리)
-     * @throws RuntimeException 카테고리를 찾을 수 없는 경우
+     * @throws NotFoundException 카테고리를 찾을 수 없는 경우
      */
     @Transactional(readOnly = true)
     public Category getCategoryBySlug(String slug) {
         return categoryRepository.findBySlugAndIsActiveTrue(slug)
-                .orElseThrow(() -> new RuntimeException("카테고리를 찾을 수 없습니다: " + slug));
+                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
     }
 
     /**
@@ -77,7 +83,7 @@ public class CategoryService {
     private void checkAdminAuthority(User user) {
 
         if (user == null) {
-            throw new RuntimeException("로그인이 필요합니다.");
+            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
         }
 
         // User의 authorities에서 ROLE_ADMIN 권한 확인
@@ -85,7 +91,7 @@ public class CategoryService {
                 .anyMatch(authority -> authority.getAuthorityName().equals("ROLE_ADMIN"));
 
         if (!isAdmin) {
-            throw new RuntimeException("관리자 권한이 필요합니다.");
+            throw new NotIncludeRoleException(CategoryErrorCode.ADMIN_REQUIRED);
         }
     }
 
@@ -143,7 +149,7 @@ public class CategoryService {
 
         // #1. 업데이트할 카테고리 탐색
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("카테고리를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. Slug 중복 체크
         if (updateDTO.getSlug() != null && !updateDTO.getSlug().equals(category.getSlug())) {
@@ -157,7 +163,7 @@ public class CategoryService {
 
             // 자기 자신을 부모로 설정하는 것 방지
             if (newParentId.equals(id)) {
-                throw new RuntimeException("자기 자신을 부모로 설정할 수 없습니다.");
+                throw new NotAllowFormException(CategoryErrorCode.SELF_PARENT_NOT_ALLOWED);
             }
 
             // 부모 존재 및 활성화 확인
@@ -165,7 +171,7 @@ public class CategoryService {
 
             // 순환 참조 방지 체크
             if (hasCircularReference(id, newParentId)) {
-                throw new RuntimeException("순환 참조가 발생합니다. 해당 카테고리를 부모로 설정할 수 없습니다.");
+                throw new NotAllowFormException(CategoryErrorCode.CIRCULAR_REFERENCE);
             }
 
             category.setParentId(newParentId);
@@ -210,17 +216,18 @@ public class CategoryService {
 
         // 1. 카테고리 존재 확인
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("카테고리를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. 자식 카테고리 존재 확인
         List<Category> children = categoryRepository.findByParentIdAndIsActiveTrueOrderBySortOrderAsc(id);
         if (!children.isEmpty()) {
-            throw new RuntimeException("하위 카테고리가 존재하여 삭제할 수 없습니다. 먼저 하위 카테고리를 삭제하거나 비활성화하세요.");
+            throw new InvalidStateException(CategoryErrorCode.HAS_CHILD_CATEGORY);
         }
 
         // 3. 게시글 존재 확인 (간단 체크: postCount 필드 활용)
         if (category.getPostCount() != null && category.getPostCount() > 0) {
-            throw new RuntimeException("해당 카테고리에 게시글이 존재하여 삭제할 수 없습니다. (" + category.getPostCount() + "개)");
+            throw new InvalidStateException(CategoryErrorCode.HAS_POSTS,
+                    CategoryErrorCode.HAS_POSTS.getMessage() + " (" + category.getPostCount() + "개)");
         }
 
         // 4. 소프트 삭제 (isActive = false)
@@ -249,7 +256,7 @@ public class CategoryService {
     @Transactional
     public Category setShopEnabled(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow( () ->new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
         category.setShopEnabled(true);
         return category;
@@ -260,7 +267,7 @@ public class CategoryService {
      * 
      * @param slug      확인할 slug
      * @param excludeId 제외할 카테고리 ID (수정 시 자기 자신 제외용)
-     * @throws RuntimeException 중복된 경우
+     * @throws AlreadyExistException 중복된 경우
      */
     private void validateSlugUnique(String slug, Long excludeId) {
 
@@ -279,7 +286,7 @@ public class CategoryService {
                     return;
                 }
             }
-            throw new RuntimeException("이미 사용 중인 슬러그입니다: " + slug);
+            throw new AlreadyExistException(CategoryErrorCode.SLUG_ALREADY_EXIST);
         }
     }
 
@@ -287,19 +294,19 @@ public class CategoryService {
      * 부모 카테고리 검증
      * - 부모 카테고리가 유효한지 (isActive) 체크한다.
      * parentId : 부모 아이디
-     * RuntimeException - 부모 카테고리를 찾을 수 없는 경우
+     * NotFoundException - 부모 카테고리를 찾을 수 없는 경우
      */
     private void validateParent(Long parentId) {
 
         Category parent = categoryRepository.findById(parentId)
-                .orElseThrow(() -> new RuntimeException("부모 카테고리를 찾을 수 없습니다: " + parentId));
+                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.PARENT_NOT_FOUND));
 
         if (!parent.getIsActive()) {
-            throw new RuntimeException("비활성화된 카테고리는 부모로 설정할 수 없습니다.");
+            throw new NotAllowFormException(CategoryErrorCode.INACTIVE_PARENT);
         }
 
         if (parent.getParentId() != null) {
-            throw new RuntimeException("카테고리는 최대 2단계까지만 설정 가능합니다.");
+            throw new NotAllowFormException(CategoryErrorCode.MAX_DEPTH_EXCEEDED);
         }
     }
 

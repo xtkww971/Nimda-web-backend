@@ -1,11 +1,15 @@
 package com.nimda.cite.domain.like.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BoardLikeResponse {
     private String message;     // "좋아요 완료" 또는 "좋아요 취소 완료"
     private long likeCount;     // 변경된 후의 총 좋아요 수

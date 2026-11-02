@@ -1,15 +1,16 @@
 package com.nimda.cite.domain.tag.service;
 
 
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.CategoryErrorCode;
+import com.nimda.cite.common.exception.errorcode.domain.TagErrorCode;
 import com.nimda.cite.domain.board.entity.Category;
 import com.nimda.cite.domain.board.repository.CategoryRepository;
 import com.nimda.cite.domain.tag.entity.Tag;
 import com.nimda.cite.domain.tag.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class TagService {
     @Transactional
     public Tag addTag(String name, Integer value, Long categoryId) {
         Category category = categoryRepository.findById(categoryId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
+                () -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND)
         );
 
         Tag tag = Tag.builder().tagName(name)
@@ -51,7 +52,7 @@ public class TagService {
     @Transactional
     public void deleteTag(Long tagId) {
         Tag tag = tagRepository.findById(tagId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
+                () -> new NotFoundException(TagErrorCode.TAG_NOT_FOUND)
         );
 
         tagRepository.deleteById(tagId);
@@ -60,7 +61,7 @@ public class TagService {
     @Transactional
     public Tag tagUpdate(Long tagId, String name, Integer sortValue, Long categoryId) {
         Tag tag = tagRepository.findById(tagId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "태그가 존재하지 않습니다.")
+                () -> new NotFoundException(TagErrorCode.TAG_NOT_FOUND)
         );
 
         if (name != null && !name.isBlank()) tag.setTagName(name);
@@ -72,7 +73,7 @@ public class TagService {
             // 2. 있는데 가져온 ID와 다를 때만 실행
             if (tag.getCategory() == null || !tag.getCategory().getId().equals(categoryId)) {
                 Category category = categoryRepository.findById(categoryId).orElseThrow(
-                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "카테고리가 존재하지 않습니다.")
+                        () -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND)
                 );
                 tag.setCategory(category);
             }
