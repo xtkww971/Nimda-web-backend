@@ -1,12 +1,14 @@
 package com.nimda.cite.user.entity;
 
+import com.nimda.cite.common.util.TableNames;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.user.AdminUserErrorCode;
+import com.nimda.cite.config.CheckConfig;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.nimda.cite.common.entity.BaseTimeEntity;
@@ -16,10 +18,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = TableNames.usersTable)
 @Getter
-@Setter
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
 
     @Id
@@ -92,13 +93,10 @@ public class User extends BaseTimeEntity {
     @Column(name = "email_hide", nullable = false)
     private boolean emailHide = false; // 기본값 설정
 
-    // 기본 생성자
-    public User() {
-    }
-
     // ERD 기반 전체 필드 생성자
-    public User(String userId, String name, String nickname, String password,
-            String studentNum, String email, String major) {
+    @Builder
+    public User(Long Id, String userId, String name, String nickname, String password,
+            String studentNum, String email, String major, String birth, String bojId) {
         this.userId = userId;
         this.name = name;
         this.nickname = nickname;
@@ -106,13 +104,81 @@ public class User extends BaseTimeEntity {
         this.studentNum = studentNum;
         this.email = email;
         this.major = major;
+        this.birth = birth;
+        this.bojId = bojId;
     }
 
     // 사용자 권한 관리 테이블
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "user_authority", joinColumns = @JoinColumn(name = "user_id"), // FK → users.id
-            inverseJoinColumns = @JoinColumn(name = "authority_id") // FK → authority.id
+    @JoinTable(name = TableNames.userAuthorityTable,
+               joinColumns = @JoinColumn(name = "user_id"), // FK → users.id
+               inverseJoinColumns = @JoinColumn(name = "authority_id") // FK → authority.id
     )
     @JsonIgnore
     private Set<Authority> authorities = new HashSet<>();
+
+    public void changeStatus(ApprovalStatus targetStatus){
+        this.status = targetStatus;
+    }
+
+    public boolean toggleEmailHide(){
+        this.emailHide = !this.emailHide;
+        return this.emailHide;
+    }
+
+    public void changeProfileImage(String profileImageKey){
+        this.profileImage = profileImageKey;
+    }
+
+    public void changeProfileDecoration(String profileDecorationKey){
+        this.profileDecoration = profileDecorationKey;
+    }
+
+    public void changePassword(String encodedPassword){
+        CheckConfig.npeAndBlankCheck(encodedPassword, "encodedPassword");
+        this.password = encodedPassword;
+    }
+
+    /**
+     * 프로필 정보 부분 수정 (null/blank인 필드는 수정하지 않음, bojId는 blank면 삭제)
+     * - 닉네임 중복 체크는 서비스에서 수행한다.
+     */
+    public void updateProfile(String nickname, String bojId, String birth, String major, String studentNum){
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
+        }
+        if (bojId != null) {
+            this.bojId = bojId.isBlank() ? null : bojId;
+        }
+        if (birth != null && !birth.isBlank()) {
+            this.birth = birth;
+        }
+        if (major != null && !major.isBlank()) {
+            this.major = major;
+        }
+        if (studentNum != null && !studentNum.isBlank()) {
+            this.studentNum = studentNum;
+        }
+    }
+
+    public void addAuthority(Authority authority){
+        CheckConfig.npeCheck(authority, "authority");
+
+        if(authorities.stream()
+                .anyMatch(a -> a.getAuthorityName().equals(authority.getAuthorityName()))){
+            return;
+        }
+
+        this.authorities.add(authority);
+    }
+
+    public void removeAuthority(Authority authority){
+        CheckConfig.npeCheck(authority, "authority");
+
+        boolean removed =  this.authorities
+                .removeIf(a -> a.getAuthorityName().equals(authority.getAuthorityName()));
+        if(!removed){
+            throw new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST);
+        }
+    }
 }

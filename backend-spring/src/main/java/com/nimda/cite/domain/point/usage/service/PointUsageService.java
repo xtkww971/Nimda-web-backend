@@ -1,5 +1,11 @@
 package com.nimda.cite.domain.point.usage.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.InvalidStateException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.BoardErrorCode;
+import com.nimda.cite.common.exception.errorcode.domain.PointErrorCode;
 import com.nimda.cite.domain.board.entity.Board;
 import com.nimda.cite.domain.board.enums.BoardStatus;
 import com.nimda.cite.domain.board.enums.ShopItemType;
@@ -12,20 +18,14 @@ import com.nimda.cite.domain.point.usage.dto.PointUsageResponse;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.domain.profiledecoration.ownership.ProfileDecorationOwnershipService;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class PointUsageService {
-
-    private static final Logger log = LoggerFactory.getLogger(PointUsageService.class);
 
     private final BoardRepository boardRepository;
     private final UserBalanceRepository userBalanceRepository;
@@ -34,54 +34,41 @@ public class PointUsageService {
 
     @Transactional
     public PointUsageResponse purchaseBoardItem(Long userId, Long boardId) {
-        try {
-            Board board = boardRepository.findById(boardId)
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "게시글을 찾을 수 없습니다: " + boardId
-                    ));
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND));
 
-            validatePurchasable(board);
-            validateNotAlreadyOwned(userId, board);
-            ShopItemType itemType = resolveItemType(board);
+        validatePurchasable(board);
+        validateNotAlreadyOwned(userId, board);
+        ShopItemType itemType = resolveItemType(board);
 
-            UserBalance balance = spendBalance(
-                    userId,
-                    "아이템 구매: " + board.getTitle(),
-                    board.getItemPrice()
-            );
+        UserBalance balance = spendBalance(
+                userId,
+                "아이템 구매: " + board.getTitle(),
+                board.getItemPrice()
+        );
 
-            return PointUsageResponse.builder()
-                    .boardId(board.getId())
-                    .itemName(board.getTitle())
-                    .price(board.getItemPrice())
-                    .remainingAmount(balance.getTotalAmount())
-                    .itemType(itemType.name())
-                    .profileDecorationKey(grantPurchasedItem(userId, board))
-                    .build();
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            log.error("상품 구매 처리 오류", e);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("상품 구매 오류", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "상품 구매 중 오류가 발생했습니다.", e);
-        }
+        return PointUsageResponse.builder()
+                .boardId(board.getId())
+                .itemName(board.getTitle())
+                .price(board.getItemPrice())
+                .remainingAmount(balance.getTotalAmount())
+                .itemType(itemType.name())
+                .profileDecorationKey(grantPurchasedItem(userId, board))
+                .build();
     }
 
     private void validatePurchasable(Board board) {
         if (board.getStatus() != BoardStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "구매할 수 없는 상품입니다.");
+            throw new InvalidStateException(PointErrorCode.ITEM_NOT_PURCHASABLE);
         }
         if (board.getCategory() == null || !Boolean.TRUE.equals(board.getCategory().getShopEnabled())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "마일리지 구매 상품이 아닙니다.");
+            throw new NotAllowFormException(PointErrorCode.NOT_SHOP_ITEM);
         }
         if (board.getItemPrice() == null || board.getItemPrice() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상품 가격이 설정되지 않았습니다.");
+            throw new InvalidStateException(PointErrorCode.ITEM_PRICE_NOT_SET);
         }
         if (resolveItemType(board) == ShopItemType.BADGE && board.getProfileDecoration() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상품에 연결된 배지가 없습니다.");
+            throw new InvalidStateException(PointErrorCode.ITEM_BADGE_NOT_LINKED);
         }
     }
 
@@ -92,7 +79,7 @@ public class PointUsageService {
 
         ProfileDecoration decoration = board.getProfileDecoration();
         if (profileDecorationOwnershipService.owns(userId, decoration.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 보유한 배지입니다.");
+            throw new AlreadyExistException(PointErrorCode.BADGE_ALREADY_OWNED);
         }
     }
 
@@ -112,15 +99,15 @@ public class PointUsageService {
 
     private UserBalance spendBalance(Long userId, String description, Long pointAmount) {
         if (pointAmount == null || pointAmount <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "차감할 마일리지가 올바르지 않습니다.");
+            throw new NotAllowFormException(PointErrorCode.INVALID_SPEND_AMOUNT);
         }
 
         UserBalance balance = userBalanceRepository.findById(userId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "포인트 계좌가 존재하지 않습니다.")
+                () -> new NotFoundException(PointErrorCode.BALANCE_NOT_FOUND)
         );
 
         if (balance.getTotalAmount() < pointAmount) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보유 마일리지가 부족합니다.");
+            throw new InvalidStateException(PointErrorCode.INSUFFICIENT_BALANCE);
         }
 
         balance.setUpdatedAt(LocalDateTime.now());

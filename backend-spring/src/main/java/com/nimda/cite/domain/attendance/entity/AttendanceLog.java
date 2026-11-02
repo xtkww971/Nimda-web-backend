@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.attendance.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.*;
         import lombok.AllArgsConstructor;
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 @Entity
 @Getter
-@Table(name = "attendance_log")
+@Table(name = TableNames.attendanceLogTable)
 @NoArgsConstructor
 @AllArgsConstructor
 public class AttendanceLog {

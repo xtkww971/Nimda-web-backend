@@ -1,6 +1,9 @@
 package com.nimda.cite.user.security;
 
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.user.entity.User;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -12,6 +15,7 @@ import java.util.stream.Collectors;
  * UserDetails 구현 클래스
  * Spring Security가 사용하는 사용자 인증 정보를 제공
  */
+@Getter
 public class CustomUserDetails implements UserDetails {
 
     private final User user;
@@ -19,6 +23,19 @@ public class CustomUserDetails implements UserDetails {
     // Constructor
     public CustomUserDetails(User user) {
         this.user = user;
+    }
+
+    // getLoginUser - @AuthenticationPrincipal로 받은 로그인 정보에서 User를 꺼낸다. (로그인 정보가 없으면 401)
+    public static User getLoginUser(CustomUserDetails userDetails) {
+        if (userDetails == null || userDetails.getUser() == null) {
+            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
+        }
+        return userDetails.getUser();
+    }
+
+    // getLoginUserOrNull - 비로그인 접근도 허용하는 API에서 사용한다.
+    public static User getLoginUserOrNull(CustomUserDetails userDetails) {
+        return userDetails != null ? userDetails.getUser() : null;
     }
 
     // getAuthorities - 사용자 권한 목록을 반환한다.
@@ -65,8 +82,4 @@ public class CustomUserDetails implements UserDetails {
         return true; // 현재는 계정 비활성화 기능 미사용
     }
 
-    // Domain Entity 반환용 Getter
-    public User getUser() {
-        return user;
-    }
 }

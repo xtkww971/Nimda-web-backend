@@ -1,40 +1,33 @@
 package com.nimda.cite.user.controller;
 
-import com.nimda.cite.common.util.MailLimitExceededException;
-import com.nimda.cite.common.util.MailService;
+import com.nimda.cite.common.exception.UnauthorizedException;
 import com.nimda.cite.common.response.ApiResponse;
-import com.nimda.cite.common.util.JwtUtil;
 import com.nimda.cite.common.util.TokenProvider;
-import com.nimda.cite.user.dto.ChangePassword.ChangePasswordRequest;
-import com.nimda.cite.user.dto.ChangePassword.CheckAuthCodeRequest;
-import com.nimda.cite.user.dto.ChangePassword.CheckUserValidateRequest;
-import com.nimda.cite.user.dto.ChangePassword.CheckUserValidateResponse;
+import com.nimda.cite.common.util.UrlNames;
+import com.nimda.cite.user.dto.changePassword.ChangePasswordRequest;
+import com.nimda.cite.user.dto.changePassword.CheckAuthCodeRequest;
+import com.nimda.cite.user.dto.changePassword.CheckUserValidateRequest;
+import com.nimda.cite.user.dto.changePassword.CheckUserValidateResponse;
+import com.nimda.cite.user.enums.MailSendResult;
 import com.nimda.cite.user.service.AuthService;
 import com.nimda.cite.user.service.UserRecoveryService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/cite/passwordChange")
+@RequestMapping(UrlNames.passwordChangeUrl)
+@RequiredArgsConstructor
 public class UserRecoveryController {
-    @Autowired
-    private UserRecoveryService userRecoveryService;
-    @Autowired
-    private AuthService authService;
-    @Autowired
-    private TokenProvider tokenProvider;
-    @Autowired
-    private MailService mailService;
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final UserRecoveryService userRecoveryService;
+    private final AuthService authService;
+    private final TokenProvider tokenProvider;
 
     // 비밀번호 변경 시 유저 정보 확인 API
-    @PostMapping("/info-check")
-    public ResponseEntity<?> checkUserInfo(@RequestBody CheckUserValidateRequest req) {
+    @PostMapping(UrlNames.checkUserInfoUrl)
+    public ResponseEntity<ApiResponse<CheckUserValidateResponse>> checkUserInfo(@RequestBody CheckUserValidateRequest req) {
         CheckUserValidateResponse dto =
                 userRecoveryService.checkValidate(req.getUserId(),req.getStudentNum(),req.getEmail());
 
@@ -42,13 +35,7 @@ public class UserRecoveryController {
             String passwordToken =
                 tokenProvider.createTokenForPasswordChange(req.getUserId(), req.getStudentNum(), req.getEmail(),false);
 
-            ResponseCookie cookie = ResponseCookie.from("password_change_token", passwordToken)
-                .httpOnly(true)
-                .secure(true)
-                .path("/api/cite/passwordChange")
-                .maxAge(5 * 60) // 5분
-                .sameSite("Strict")
-                .build();
+            ResponseCookie cookie = createPasswordChangeCookie(passwordToken);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -60,82 +47,59 @@ public class UserRecoveryController {
 
     // 메일 전송 버튼과 연결됨
     // body와 쿠키를 받기 위해 Post로 해야함
-    // 응답 본문은 항상 HTTP 200 + "OK" | "UNAUTHORIZED" | "LIMIT_EXCEEDED" 문자열 중 하나
-    @PostMapping("/send-authMail")
-    public ResponseEntity<?> sendMail(@RequestBody CheckUserValidateRequest req,
-                                      @CookieValue(name = "password_change_token") String token) {
+    // 응답 본문은 항상 HTTP 200 + "OK" | "UNAUTHORIZED" | "LIMIT_EXCEEDED" 문자열 중 하나 (프론트 userRecovery.ts 계약)
+    @PostMapping(UrlNames.sendAuthMailUrl)
+    public ResponseEntity<String> sendMail(@RequestBody CheckUserValidateRequest req,
+                                           @CookieValue(name = "password_change_token") String token) {
+        MailSendResult result = userRecoveryService.sendAuthMail(req, token);
 
-        boolean isVerified = jwtUtil.validateToken(
-                token, req.getUserId(),req.getStudentNum(),req.getEmail()
-        );
-
-        if(!isVerified) {
-            return ResponseEntity.ok(HttpStatus.UNAUTHORIZED);
-        }
-
-        try {
-            mailService.sendAuthCode(req.getEmail());
-            // 인증 화면으로 이동
-            return ResponseEntity.ok(HttpStatus.OK);
-        } catch (MailLimitExceededException e) {
-            // 하루 발송 횟수 제한 초과 (세션 만료와 구분되는 원인)
-            return ResponseEntity.ok("LIMIT_EXCEEDED");
-        }
+        // OK면 인증 화면으로 이동
+        return ResponseEntity.ok(result.name());
     }
 
     // 인증 버튼과 연결
-    @PostMapping("/check-authcode")
-    public ResponseEntity<?> checkAuthCode(@RequestBody CheckAuthCodeRequest req,
-                                           @CookieValue(name = "password_change_token") String token) {
+    // 응답 본문은 문자열 (성공: "인증이 완료되었습니다.", 실패: 403/401 + 에러 메시지 문자열)
+    @PostMapping(UrlNames.checkAuthCodeUrl)
+    public ResponseEntity<String> checkAuthCode(@RequestBody CheckAuthCodeRequest req,
+                                                @CookieValue(name = "password_change_token") String token) {
+        String emailVerifiedToken = userRecoveryService.verifyAuthCode(token, req.getAuthCode());
 
-        // 1. 토큰이 유효한지 먼저 체크하고, 토큰 내부에 저장된 이메일을 꺼냅니다.
-        if (!tokenProvider.validateToken(token)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("인증 세션이 만료되었습니다.");
-        }
+        // 인증 완료 토큰 재발급
+        ResponseCookie cookie = createPasswordChangeCookie(emailVerifiedToken);
 
-        String emailFromToken = jwtUtil.extractClaimByKey(token, "email");
-        boolean isCodeValid = mailService.verifyCode(emailFromToken, req.getAuthCode());
-
-        if (isCodeValid) {
-            String userId = jwtUtil.extractClaimByKey(token, "userId");
-            String studentNum = jwtUtil.extractClaimByKey(token, "studentNum");
-            String emailVerifiedToken = tokenProvider.createTokenForPasswordChange(userId, studentNum, emailFromToken, true);
-
-            // 인증 완료 토큰 재발급
-            ResponseCookie cookie = ResponseCookie.from("password_change_token", emailVerifiedToken)
-                    .httpOnly(true)
-                    .secure(true)
-                    .path("/api/cite/passwordChange")
-                    .maxAge(5 * 60)
-                    .sameSite("Strict")
-                    .build();
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                    .body("인증이 완료되었습니다.");
-        }
-
-        // 3. 인증 실패 시
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증에 실패했습니다.");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body("인증이 완료되었습니다.");
     }
 
-    @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@CookieValue(name = "password_change_token") String token,
-                                            @RequestBody ChangePasswordRequest req) {
-        if (!tokenProvider.validateToken(token)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("인증 세션이 만료되었습니다.");
-        }
-
-        Boolean isEmailVerified =
-                jwtUtil.extractClaim(token, claims -> claims.get("isEmailVerified", Boolean.class));
-
-        if (isEmailVerified == null || !isEmailVerified) {
-            // 인증하지 않고 우회한 경우
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("이메일 인증이 완료되지 않은 요청입니다.");
-        }
-        
-        String userId = jwtUtil.extractId(token);
+    // 응답 본문은 문자열 (성공: "비밀번호가 재설정되었습니다.", 실패: 403 + 에러 메시지 문자열)
+    @PostMapping(UrlNames.changePasswordUrl)
+    public ResponseEntity<String> changePassword(@CookieValue(name = "password_change_token") String token,
+                                                 @RequestBody ChangePasswordRequest req) {
+        String userId = userRecoveryService.validatePasswordChangeToken(token);
         authService.changePassword(userId, req.getPassword());
         return ResponseEntity.ok("비밀번호가 재설정되었습니다.");
+    }
+
+    /**
+     * 비밀번호 재설정 인증 실패(세션 만료, 인증 코드 불일치, 이메일 미인증)는
+     * 프론트 계약에 맞춰 ApiResponse가 아닌 에러 메시지 문자열로 응답한다. (상태 코드는 ErrorCode 기준)
+     * - 컨트롤러 내부 @ExceptionHandler라 GlobalExceptionHandler보다 우선 적용되고, 이 컨트롤러에만 영향을 준다.
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<String> handleRecoveryUnauthorized(UnauthorizedException e) {
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
+                .body(e.getMessage());
+    }
+
+    private ResponseCookie createPasswordChangeCookie(String token) {
+        return ResponseCookie.from("password_change_token", token)
+                .httpOnly(true)
+                .secure(true)
+                .path("/api/cite/passwordChange")
+                .maxAge(5 * 60) // 5분
+                .sameSite("Strict")
+                .build();
     }
 }

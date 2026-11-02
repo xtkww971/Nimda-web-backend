@@ -1,5 +1,7 @@
 package com.nimda.cite.common.s3;
 
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.errorcode.domain.AttachmentErrorCode;
 import com.nimda.cite.domain.attachment.service.AttachmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -36,7 +38,7 @@ public class S3Service {
                 ? Set.of("svg", "png", "jpg", "jpeg", "webp").contains(ext)
                 : AttachmentService.isAllowedExtension(ext);
         if (!allowed) {
-            throw new IllegalArgumentException("허용되지 않는 파일 형식입니다: " + ext);
+            throw new NotAllowFormException(AttachmentErrorCode.FILE_FORM_NOT_ALLOW);
         }
 
         // 1. 경로 결정 (null이면 temp/)

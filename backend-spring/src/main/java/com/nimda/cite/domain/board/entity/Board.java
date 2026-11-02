@@ -30,6 +30,7 @@ package com.nimda.cite.domain.board.entity;
  * ========================================
  */
 
+import com.nimda.cite.common.util.TableNames;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.nimda.cite.domain.board.enums.BoardStatus;
@@ -45,7 +46,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "board")
+@Table(name = TableNames.boardTable)
 @Getter
 @Setter
 @NoArgsConstructor

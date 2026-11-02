@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.notification.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.domain.notification.enums.NotificationType;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.Entity;
@@ -17,6 +18,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
+@Table(name = TableNames.notificationTable)
 @Getter // 필드 조회를 위해 필수
 @Setter // 필요 시 추가
 @Builder

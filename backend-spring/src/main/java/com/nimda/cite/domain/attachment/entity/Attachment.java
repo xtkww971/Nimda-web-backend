@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.attachment.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -12,7 +13,7 @@ import lombok.NoArgsConstructor;
  * - API 응답/요청은 DTO(AttachmentResponseDto, AttachmentCreateRequestDto) 사용
  */
 @Entity
-@Table(name = "attachments")
+@Table(name = TableNames.attachmentsTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Attachment extends BaseTimeEntity {

@@ -1,6 +1,7 @@
 package com.nimda.cite.domain.like.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.domain.like.dto.CommentLikeResponse;
 import com.nimda.cite.domain.like.service.CommentLikeService;
 import com.nimda.cite.user.security.CustomUserDetails;
@@ -10,13 +11,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/like/comment")
+@RequestMapping(UrlNames.commentLikeUrl)
 @RequiredArgsConstructor
 public class CommentLikeController {
 
     private final CommentLikeService commentLikeService;
 
-    @PostMapping("/{commentId}")
+    @PostMapping(UrlNames.toggleCommentLikeUrl)
     public ResponseEntity<?> toggleLike(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long commentId) {
@@ -29,7 +30,7 @@ public class CommentLikeController {
         return ApiResponse.ok(CommentLikeResponse.of(message, likeCount, isLiked)).toResponse();
     }
 
-    @GetMapping("/{commentId}/likeCount")
+    @GetMapping(UrlNames.getCommentLikeCountUrl)
     public ResponseEntity<?> getLikeCount(@PathVariable Long commentId) {
         Long likeCount = commentLikeService.getLikeCount(commentId);
         CommentLikeResponse dto = CommentLikeResponse.builder().likeCount(likeCount).build();

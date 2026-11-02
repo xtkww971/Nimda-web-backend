@@ -1,9 +1,16 @@
 package com.nimda.cite.domain.profiledecoration.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.ExternalServiceException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.ProfileDecorationErrorCode;
+import com.nimda.cite.common.s3.S3Service;
 import com.nimda.cite.domain.profiledecoration.repository.ProfileDecorationRepository;
 import com.nimda.cite.domain.profiledecoration.dto.ProfileDecorationCreateRequest;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +22,9 @@ import java.util.Locale;
 public class ProfileDecorationService {
 
     private final ProfileDecorationRepository repository;
+
+    @Autowired(required = false)
+    private S3Service s3Service;
 
     @Transactional(readOnly = true)
     public List<ProfileDecoration> getActiveDecorations() {
@@ -29,13 +39,35 @@ public class ProfileDecorationService {
     @Transactional(readOnly = true)
     public ProfileDecoration getByKey(String key) {
         return repository.findByKey(key)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로필 장식입니다."));
+                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.DECORATION_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
     public ProfileDecoration getById(Long id) {
+        if (id == null) {
+            throw new NotAllowFormException(ProfileDecorationErrorCode.DECORATION_ID_REQUIRED);
+        }
         return repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로필 배지입니다."));
+                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.BADGE_NOT_FOUND));
+    }
+
+    /**
+     * 배지 이미지 URL 조회
+     * - 절대 경로/외부 URL이면 그대로, S3 키면 Presigned GET URL로 변환한다.
+     */
+    @Transactional(readOnly = true)
+    public String getDecorationImageUrl(String key) {
+        String filePath = getByKey(key).getFilePath();
+
+        if (filePath.startsWith("/") || filePath.startsWith("http://") || filePath.startsWith("https://")) {
+            return filePath;
+        }
+
+        if (s3Service == null) {
+            throw new ExternalServiceException(ProfileDecorationErrorCode.IMAGE_SERVICE_UNAVAILABLE);
+        }
+
+        return s3Service.createPresignedGetUrl(filePath, 60, "inline");
     }
 
     @Transactional
@@ -47,21 +79,21 @@ public class ProfileDecorationService {
         boolean purchaseRequired = true;
 
         if (key.isBlank()) {
-            throw new IllegalArgumentException("배지 키를 입력해주세요.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_KEY_REQUIRED);
         }
         if (!key.matches("^[a-z0-9][a-z0-9-]{1,98}$")) {
-            throw new IllegalArgumentException("배지 키는 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_KEY_INVALID);
         }
         if (label.isBlank()) {
-            throw new IllegalArgumentException("배지 이름을 입력해주세요.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_LABEL_REQUIRED);
         }
         if (filePath.isBlank()) {
-            throw new IllegalArgumentException("배지 이미지 경로가 필요합니다.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_IMAGE_REQUIRED);
         }
         ProfileDecoration existing = repository.findByKey(key).orElse(null);
         if (existing != null) {
             if (existing.isActive()) {
-                throw new IllegalArgumentException("이미 존재하는 배지 키입니다.");
+                throw new AlreadyExistException(ProfileDecorationErrorCode.BADGE_KEY_ALREADY_EXIST);
             }
             existing.update(label, filePath, requiredRole, true);
             existing.setPurchaseRequired(purchaseRequired);
@@ -77,7 +109,7 @@ public class ProfileDecorationService {
     @Transactional
     public void delete(Long id) {
         ProfileDecoration decoration = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로필 배지입니다."));
+                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.BADGE_NOT_FOUND));
         decoration.deactivate();
     }
 

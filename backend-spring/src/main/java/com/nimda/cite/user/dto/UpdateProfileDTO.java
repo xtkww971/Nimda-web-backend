@@ -3,14 +3,12 @@ package com.nimda.cite.user.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /**
  * 사용자 프로필 수정 요청 DTO
  * null인 필드는 수정하지 않음 (부분 업데이트)
  */
 @Getter
-@Setter
 @NoArgsConstructor
 public class UpdateProfileDTO {
 

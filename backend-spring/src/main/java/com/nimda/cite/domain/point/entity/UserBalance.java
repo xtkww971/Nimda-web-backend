@@ -1,12 +1,13 @@
 package com.nimda.cite.domain.point.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Table(name = "user_balance")
+@Table(name = TableNames.userBalanceTable)
 @Entity
 @Getter
 @Setter

@@ -1,5 +1,9 @@
 package com.nimda.cite.domain.profiledecoration.ownership;
 
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.ProfileDecorationErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
@@ -24,39 +28,45 @@ public class ProfileDecorationOwnershipService {
     @Transactional
     public void grant(Long userId, ProfileDecoration profileDecoration) {
         if (profileDecoration == null || !profileDecoration.isActive()) {
-            throw new IllegalArgumentException("사용할 수 없는 프로필 배지입니다.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_NOT_USABLE);
         }
         if (owns(userId, profileDecoration.getId())) {
             return;
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
         repository.save(new UserProfileDecoration(user, profileDecoration));
     }
 
     @Transactional
     public void grantByStudentNum(String studentNum, ProfileDecoration profileDecoration) {
-        User user = userRepository.findByStudentNum(studentNum)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 학번입니다."));
+        User user = findUserByStudentNum(studentNum);
         grant(user.getId(), profileDecoration);
     }
 
     @Transactional
     public void revokeByStudentNum(String studentNum, ProfileDecoration profileDecoration) {
-        User user = userRepository.findByStudentNum(studentNum)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 학번입니다."));
+        User user = findUserByStudentNum(studentNum);
         if (profileDecoration == null) {
-            throw new IllegalArgumentException("존재하지 않는 프로필 배지입니다.");
+            throw new NotFoundException(ProfileDecorationErrorCode.BADGE_NOT_FOUND);
         }
         repository.deleteByUserIdAndProfileDecorationId(user.getId(), profileDecoration.getId());
         if (profileDecoration.getKey().equals(user.getProfileDecoration())) {
-            user.setProfileDecoration(null);
+            user.changeProfileDecoration(null);
         }
     }
 
     @Transactional(readOnly = true)
     public List<ProfileDecoration> getOwnedDecorations(Long userId) {
         return repository.findDecorationsByUserId(userId);
+    }
+
+    private User findUserByStudentNum(String studentNum) {
+        if (studentNum == null || studentNum.isBlank()) {
+            throw new NotAllowFormException(ProfileDecorationErrorCode.STUDENT_NUM_REQUIRED);
+        }
+        return userRepository.findByStudentNum(studentNum.trim())
+                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.STUDENT_NUM_NOT_FOUND));
     }
 }

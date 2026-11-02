@@ -1,40 +1,32 @@
 package com.nimda.cite.domain.profiledecoration.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
-import com.nimda.cite.common.s3.S3Service;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.domain.profiledecoration.dto.ProfileDecorationCreateRequest;
 import com.nimda.cite.domain.profiledecoration.dto.ProfileDecorationDto;
+import com.nimda.cite.domain.profiledecoration.dto.ProfileDecorationGrantRequestDTO;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.domain.profiledecoration.ownership.ProfileDecorationOwnershipService;
 import com.nimda.cite.domain.profiledecoration.service.ProfileDecorationService;
 import com.nimda.cite.user.security.CustomUserDetails;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/api/cite")
+@RequestMapping(UrlNames.profileDecorationBaseUrl)
+@RequiredArgsConstructor
 public class ProfileDecorationController {
 
     private final ProfileDecorationService service;
     private final ProfileDecorationOwnershipService ownershipService;
 
-    @Autowired(required = false)
-    private S3Service s3Service;
 
-    public ProfileDecorationController(
-            ProfileDecorationService profileDecorationService,
-            ProfileDecorationOwnershipService ownershipService) {
-        this.service = profileDecorationService;
-        this.ownershipService = ownershipService;
-    }
-
-    @GetMapping("/profile-decorations")
+    @GetMapping(UrlNames.getActiveDecorationsUrl)
     public ResponseEntity<?> getActiveDecorations() {
         return ApiResponse.ok(
                 service.getActiveDecorations().stream()
@@ -43,42 +35,26 @@ public class ProfileDecorationController {
         ).toResponse();
     }
 
-    @GetMapping("/profile-decorations/{key}/image")
-    public ResponseEntity<?> getDecorationImage(@PathVariable String key) {
-        ProfileDecoration decoration = service.getByKey(key);
-        String filePath = decoration.getFilePath();
-
-        if (filePath.startsWith("/") || filePath.startsWith("http://") || filePath.startsWith("https://")) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header(HttpHeaders.LOCATION, filePath)
-                    .build();
-        }
-
-        if (s3Service == null) {
-            return ApiResponse.fail("배지 이미지 서비스를 사용할 수 없습니다.").toResponse(HttpStatus.SERVICE_UNAVAILABLE);
-        }
-
-        String url = s3Service.createPresignedGetUrl(filePath, 60, "inline");
+    @GetMapping(UrlNames.getDecorationImageUrl)
+    public ResponseEntity<Void> getDecorationImage(@PathVariable String key) {
         return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, url)
+                .header(HttpHeaders.LOCATION, service.getDecorationImageUrl(key))
                 .build();
     }
 
-    @GetMapping("/profile-decorations/me")
+    @GetMapping(UrlNames.getMyDecorationsUrl)
     public ResponseEntity<?> getMyDecorations(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        if (userDetails == null) {
-            return ApiResponse.fail("로그인이 필요합니다.").toResponse(HttpStatus.UNAUTHORIZED);
-        }
+        Long userId = CustomUserDetails.getLoginUser(userDetails).getId();
 
         return ApiResponse.ok(
-                ownershipService.getOwnedDecorations(userDetails.getUser().getId()).stream()
+                ownershipService.getOwnedDecorations(userId).stream()
                         .map(ProfileDecorationDto::from)
                         .toList()
         ).toResponse();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/admin/profile-decorations")
+    @GetMapping(UrlNames.getAdminDecorationsUrl)
     public ResponseEntity<?> getAdminDecorations() {
         return ApiResponse.ok(
                 service.getAllDecorations().stream()
@@ -89,77 +65,32 @@ public class ProfileDecorationController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/admin/profile-decorations")
+    @PostMapping(UrlNames.createDecorationUrl)
     public ResponseEntity<?> createDecoration(@RequestBody ProfileDecorationCreateRequest request) {
-        try {
-            ProfileDecoration decoration = service.create(request);
-            return ApiResponse.ok("프로필 배지가 등록되었습니다.", ProfileDecorationDto.from(decoration)).toResponse();
-        } catch (IllegalArgumentException e) {
-            return ApiResponse.fail(e.getMessage()).toResponse(HttpStatus.BAD_REQUEST);
-        }
+        ProfileDecoration decoration = service.create(request);
+        return ApiResponse.ok("프로필 배지가 등록되었습니다.", ProfileDecorationDto.from(decoration)).toResponse();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/admin/profile-decorations/ownership/grant")
-    public ResponseEntity<?> grantDecoration(@RequestBody Map<String, Object> request) {
-        try {
-            String studentNum = readRequiredString(request, "studentNum");
-            Long decorationId = readRequiredLong(request, "decorationId");
-            ProfileDecoration decoration = service.getById(decorationId);
-            ownershipService.grantByStudentNum(studentNum, decoration);
-            return ApiResponse.ok("프로필 배지가 지급되었습니다.").toResponse();
-        } catch (IllegalArgumentException e) {
-            return ApiResponse.fail(e.getMessage()).toResponse(HttpStatus.BAD_REQUEST);
-        }
+    @PostMapping(UrlNames.grantDecorationUrl)
+    public ResponseEntity<?> grantDecoration(@RequestBody ProfileDecorationGrantRequestDTO request) {
+        ProfileDecoration decoration = service.getById(request.getDecorationId());
+        ownershipService.grantByStudentNum(request.getStudentNum(), decoration);
+        return ApiResponse.ok("프로필 배지가 지급되었습니다.").toResponse();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/admin/profile-decorations/ownership/revoke")
-    public ResponseEntity<?> revokeDecoration(@RequestBody Map<String, Object> request) {
-        try {
-            String studentNum = readRequiredString(request, "studentNum");
-            Long decorationId = readRequiredLong(request, "decorationId");
-            ProfileDecoration decoration = service.getById(decorationId);
-            ownershipService.revokeByStudentNum(studentNum, decoration);
-            return ApiResponse.ok("프로필 배지가 회수되었습니다.").toResponse();
-        } catch (IllegalArgumentException e) {
-            return ApiResponse.fail(e.getMessage()).toResponse(HttpStatus.BAD_REQUEST);
-        }
+    @PostMapping(UrlNames.revokeDecorationUrl)
+    public ResponseEntity<?> revokeDecoration(@RequestBody ProfileDecorationGrantRequestDTO request) {
+        ProfileDecoration decoration = service.getById(request.getDecorationId());
+        ownershipService.revokeByStudentNum(request.getStudentNum(), decoration);
+        return ApiResponse.ok("프로필 배지가 회수되었습니다.").toResponse();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/admin/profile-decorations/{id}")
+    @DeleteMapping(UrlNames.deleteDecorationUrl)
     public ResponseEntity<?> deleteDecoration(@PathVariable Long id) {
-        try {
-            service.delete(id);
-            return ApiResponse.ok("프로필 배지가 삭제되었습니다.").toResponse();
-        } catch (IllegalArgumentException e) {
-            return ApiResponse.fail(e.getMessage()).toResponse(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    private static String readRequiredString(Map<String, Object> request, String key) {
-        Object value = request != null ? request.get(key) : null;
-        String text = value != null ? String.valueOf(value).trim() : "";
-        if (text.isBlank()) {
-            throw new IllegalArgumentException(key + " 값이 필요합니다.");
-        }
-        return text;
-    }
-
-    private static Long readRequiredLong(Map<String, Object> request, String key) {
-        Object value = request != null ? request.get(key) : null;
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        String text = value != null ? String.valueOf(value).trim() : "";
-        if (text.isBlank()) {
-            throw new IllegalArgumentException(key + " 값이 필요합니다.");
-        }
-        try {
-            return Long.parseLong(text);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(key + " 값이 올바르지 않습니다.");
-        }
+        service.delete(id);
+        return ApiResponse.ok("프로필 배지가 삭제되었습니다.").toResponse();
     }
 }

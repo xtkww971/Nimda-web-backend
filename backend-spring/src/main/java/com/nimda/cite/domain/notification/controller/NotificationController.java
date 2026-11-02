@@ -2,6 +2,7 @@ package com.nimda.cite.domain.notification.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.s3.S3Service;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.domain.notification.dto.NotificationResponse;
 import com.nimda.cite.domain.notification.entity.Notification;
 import com.nimda.cite.domain.notification.repositroy.NotificationRepositroy;
@@ -9,7 +10,6 @@ import com.nimda.cite.domain.notification.service.NotificationService;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -17,19 +17,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping(UrlNames.notificationUrl)
 @RequiredArgsConstructor
 public class NotificationController {
 
     private final NotificationRepositroy notificationRepository;
     private final NotificationService notificationService;
 
-    @Autowired(required = false)
-    private S3Service s3Service;
+    private final S3Service s3Service;
 
     // 도착한 알림 최신순으로 조회
-    @GetMapping
-    public ResponseEntity<?> getNotifications(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    @GetMapping(UrlNames.getNotificationsUrl)
+    public ResponseEntity<ApiResponse<List<NotificationResponse>>> getNotifications(@AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userDetails.getUser();
         List<Notification> notifications = notificationRepository.findAllByRecipient(user);
         List<NotificationResponse> dto = notifications.stream().map(n -> toResponse(n)).toList();
@@ -37,7 +36,7 @@ public class NotificationController {
     }
 
     // 읽지 않은 알림만 조회
-    @GetMapping("/unRead")
+    @GetMapping(UrlNames.getUnReadNotificationsUrl)
     public ResponseEntity<?> getUnReadNotifications(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
@@ -65,14 +64,14 @@ public class NotificationController {
     }
 
     // 알림 읽기 처리
-    @PatchMapping("/{notificationId}/read")
+    @PatchMapping(UrlNames.markAsReadUrl)
     public ResponseEntity<?> markAsRead(@PathVariable Long notificationId) {
         notificationService.markAsRead(notificationId);
         return ApiResponse.ok().toResponse();
     }
 
     // 읽지 않은 알람 모두 읽기 처리
-    @PatchMapping("/readAll")
+    @PatchMapping(UrlNames.markAllAsReadUrl)
     public ResponseEntity<?> markAllAsRead(@AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userDetails.getUser();
         List<Notification> unreadNotifications = notificationRepository.findAllByRecipientAndIsReadFalse(user);
@@ -84,7 +83,7 @@ public class NotificationController {
     }
 
     // 읽지 않은 알림 개수와 여부 확인
-    @GetMapping("/hasUnread")
+    @GetMapping(UrlNames.hasUnreadNotificationUrl)
     public ResponseEntity<?> hasUnread(@AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userDetails.getUser();
         Boolean hasUnread = notificationService.hasUnRead(user.getId());
@@ -94,7 +93,7 @@ public class NotificationController {
     }
 
     // 알림 삭제
-    @DeleteMapping("/{notificationId}")
+    @DeleteMapping(UrlNames.deleteNotificationUrl)
     public ResponseEntity<?> deleteNotification(@PathVariable Long notificationId) {
         notificationService.deleteNotification(notificationId);
         return ApiResponse.ok("알림이 삭제되었습니다.").toResponse();

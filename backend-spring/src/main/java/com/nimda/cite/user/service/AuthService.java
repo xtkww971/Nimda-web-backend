@@ -1,97 +1,86 @@
 package com.nimda.cite.user.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.domain.ProfileDecorationErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
+import com.nimda.cite.config.CheckConfig;
+import com.nimda.cite.user.dto.register.RegisterRequestDTO;
+import com.nimda.cite.user.dto.register.RegisterResponseDTO;
+import lombok.RequiredArgsConstructor;
 import redis.util.RedisUtil;
-import com.nimda.cite.domain.point.entity.UserBalance;
-import com.nimda.cite.domain.point.repositroy.UserBalanceRepository;
 import com.nimda.cite.user.dto.LoginResponseDTO;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
-import com.nimda.cite.user.exception.UserNotApprovedException;
+import com.nimda.cite.common.exception.UserNotApprovedException;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.domain.profiledecoration.repository.ProfileDecorationRepository;
 import com.nimda.cite.domain.profiledecoration.ownership.ProfileDecorationOwnershipService;
 import com.nimda.cite.common.util.JwtUtil;
 import com.nimda.cite.user.repository.UserRepository;
 import com.nimda.cite.user.security.CustomUserDetails;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AuthService {
+    private final UserService userService; // service 내부에서 service를 부르는 무한 순환 참조 문제 대상
 
-    @Autowired
-    private UserService userService;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private ApplicationEventPublisher eventPublisher;
-    @Autowired
-    private UserBalanceRepository userBalanceRepository;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private ProfileDecorationRepository profileDecorationRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final ApplicationEventPublisher eventPublisher;
+    private final UserRepository userRepository;
+    private final ProfileDecorationRepository profileDecorationRepository;
 
-    @Autowired
-    private ProfileDecorationOwnershipService profileDecorationOwnershipService;
-    @Autowired
-    private RedisUtil redisUtil;
+    private final ProfileDecorationOwnershipService profileDecorationOwnershipService;
+    private final RedisUtil redisUtil;
 
     /**
      * 사용자 인증
-     * 
+     *
      * @param userId   사용자 ID
      * @param password 비밀번호
-     * @return 인증된 사용자 정보 (Optional)
+     * @return 인증된 사용자
+     * @throws UnauthorizedException    아이디가 없거나 비밀번호가 틀린 경우 (계정 존재 여부를 노출하지 않도록 동일한 에러 사용)
      * @throws UserNotApprovedException 승인되지 않은 사용자인 경우
      */
-    @Transactional(readOnly = true)
-    public Optional<User> validateUser(String userId, String password) {
-        Optional<User> userOpt = userService.findByUserId(userId);
+    public User validateUser(String userId, String password) {
+        CheckConfig.npeAndBlankCheck(userId, "userId");
+        CheckConfig.npeAndBlankCheck(password, "password");
 
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new UnauthorizedException(AuthErrorCode.INVALID_CREDENTIALS));
 
-            // 1. 비밀번호 확인
-            if (!passwordEncoder.matches(password, user.getPassword())) {
-                return Optional.empty(); // 비밀번호 오류
-            }
-
-            // 2. 승인 상태 확인
-            // Note. 유저의 현재 상태에 따른 커스텀 예회를 반환한다.
-            if (user.getStatus() == null || user.getStatus() != ApprovalStatus.APPROVED) {
-                if (user.getStatus() == ApprovalStatus.PENDING) {
-                    throw new UserNotApprovedException("승인 대기 중인 계정입니다. 관리자 승인 후 로그인할 수 있습니다.");
-                } else if (user.getStatus() == ApprovalStatus.REJECTED) {
-                    throw new UserNotApprovedException("승인이 거부된 계정입니다.");
-                } else {
-                    throw new UserNotApprovedException("승인되지 않은 계정입니다.");
-                }
-            }
-
-            // 3. 인증 성공 - 비밀번호를 제외한 사용자 정보 반환
-            User userWithoutPassword = new User();
-            userWithoutPassword.setId(user.getId());
-            userWithoutPassword.setUserId(user.getUserId());
-            userWithoutPassword.setNickname(user.getNickname());
-            userWithoutPassword.setEmail(user.getEmail());
-            return Optional.of(userWithoutPassword);
+        // 1. 비밀번호 확인
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new UnauthorizedException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
-        return Optional.empty(); // 사용자를 찾을 수 없음
+        // 2. 승인 상태 확인
+        // Note. 유저의 현재 상태에 따른 커스텀 예회를 반환한다.
+        if (user.getStatus() != ApprovalStatus.APPROVED) {
+            if (user.getStatus() == ApprovalStatus.PENDING) {
+                throw new UserNotApprovedException(AuthErrorCode.STATUS_PENDING);
+            } else if (user.getStatus() == ApprovalStatus.REJECTED) {
+                throw new UserNotApprovedException(AuthErrorCode.STATUS_REJECTED);
+            } else {
+                throw new UserNotApprovedException(AuthErrorCode.STATUS_NOT_APPROVED);
+            }
+        }
+
+        // 3. 인증 성공
+        return user;
     }
 
     /* 로그인 처리 */
@@ -99,8 +88,8 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponseDTO login(User user) {
         // 권한 정보를 포함한 전체 User 객체 조회 (@EntityGraph로 권한 정보 함께 로드)
-        User fullUser = userService.findById(user.getId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User fullUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new NotFoundException(AuthErrorCode.USER_NOT_FOUND));
 
         CustomUserDetails userDetails = new CustomUserDetails(fullUser);
         Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -138,45 +127,22 @@ public class AuthService {
 
     /**
      * 회원가입 처리 (UserService에 위임)
+     *
+     * 이것도 굉장히 위태위태 하다. 회원가입을 userService에서 의존해야 된다는 사실은 인지했는데, 이걸 왜 Auth쪽에서 가져가는거지?
+     * Auth는 Authentication, 즉 인증을 위한 기능들을 넣는 것인데, 회원가입 자체만으로 인증을 한다고 볼 수 있나?
      */
     @Transactional
-    public User register(String userId, String name, String nickname, String password,
-            String studentNum, String email, String major,
-            String bojId, String birth) {
-
-        // UserService에 사용자 생성 위임 (중복 확인 포함)
-        User user = userService.createUser(userId, name, nickname, password,
-                studentNum, email, major, bojId, birth);
-
-        // 비밀번호를 제외한 사용자 정보 반환
-        User userWithoutPassword = new User();
-        userWithoutPassword.setId(user.getId());
-        userWithoutPassword.setUserId(user.getUserId());
-        userWithoutPassword.setNickname(user.getNickname());
-        userWithoutPassword.setEmail(user.getEmail());
-
-        // 유저 계좌 생성
-        UserBalance userBalance = UserBalance.builder()
-                .user(user)
-                .totalAmount(0L)
-                .updatedAt(LocalDateTime.now())
-                .build();
-        userBalanceRepository.save(userBalance);
-
-        return userWithoutPassword;
+    public RegisterResponseDTO register(RegisterRequestDTO registerRequest) {
+        return userService.createUser(registerRequest);
     }
 
     @Transactional
     public boolean toggleEmailHide(Long userId) {
         // 1. 유저 조회 (없으면 예외 발생)
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        User user = findUser(userId);
 
         // 2. 상태 반전 (Dirty Checking에 의해 메서드 종료 시 자동 UPDATE)
-        boolean newStatus = !user.isEmailHide();
-        user.setEmailHide(newStatus);
-
-        return newStatus;
+        return user.toggleEmailHide();
     }
 
     /**
@@ -184,9 +150,12 @@ public class AuthService {
      */
     @Transactional
     public User updateProfileImage(Long userId, String profileImageKey) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
-        user.setProfileImage(profileImageKey);
+        if (profileImageKey == null || profileImageKey.isBlank()) {
+            throw new NotAllowFormException(UserErrorCode.PROFILE_IMAGE_KEY_REQUIRED);
+        }
+
+        User user = findUser(userId);
+        user.changeProfileImage(profileImageKey);
         return user;
     }
 
@@ -195,26 +164,24 @@ public class AuthService {
      */
     @Transactional
     public User updateProfileDecoration(Long userId, String profileDecorationKey) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        User user = findUser(userId);
         if (profileDecorationKey == null || profileDecorationKey.isBlank()) {
-            user.setProfileDecoration(null);
+            user.changeProfileDecoration(null);
             return user;
         }
 
         String decorationKey = profileDecorationKey.trim();
         ProfileDecoration decoration = profileDecorationRepository.findByKey(decorationKey)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로필 장식입니다."));
+                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.DECORATION_NOT_FOUND));
         if (!decoration.isActive()) {
-            throw new IllegalArgumentException("사용할 수 없는 프로필 장식입니다.");
+            throw new NotAllowFormException(ProfileDecorationErrorCode.DECORATION_NOT_USABLE);
         }
 
         if (!profileDecorationOwnershipService.owns(userId, decoration.getId())) {
-            throw new SecurityException("보유한 프로필 장식만 사용할 수 있습니다.");
+            throw new NotIncludeRoleException(ProfileDecorationErrorCode.DECORATION_NOT_OWNED);
         }
 
-        user.setProfileDecoration(
-                decorationKey);
+        user.changeProfileDecoration(decorationKey);
         return user;
     }
 
@@ -224,44 +191,30 @@ public class AuthService {
      */
     @Transactional
     public User updateProfile(Long userId, String nickname, String bojId, String birth, String major, String studentNum) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        User user = findUser(userId);
 
         // 닉네임 변경 시 중복 체크
-        if (nickname != null && !nickname.isBlank() && !nickname.equals(user.getNickname())) {
-            if (userRepository.existsByNickname(nickname)) {
-                throw new RuntimeException("이미 사용 중인 닉네임입니다.");
-            }
-            user.setNickname(nickname);
-        }
-
-        if (bojId != null) {
-            user.setBojId(bojId.isBlank() ? null : bojId);
-        }
-
-        if (birth != null && !birth.isBlank()) {
-            user.setBirth(birth);
-        }
-
-        if (major != null && !major.isBlank()) {
-            user.setMajor(major);
-        }
-
-        if (studentNum != null && !studentNum.isBlank()) {
-            user.setStudentNum(studentNum);
+        if (nickname != null && !nickname.isBlank() && !nickname.equals(user.getNickname())
+                && userRepository.existsByNickname(nickname)) {
+            throw new AlreadyExistException(UserErrorCode.NICKNAME_ALREADY_EXIST);
         }
 
         // Dirty Checking에 의해 자동 UPDATE
+        user.updateProfile(nickname, bojId, birth, major, studentNum);
         return user;
     }
 
     @Transactional
     public void changePassword(String userId, String password) {
-        User user = userRepository.findByUserId(userId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
-        );
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException(AuthErrorCode.USER_NOT_FOUND));
 
         String encodedPassword = passwordEncoder.encode(password);
-        user.setPassword(encodedPassword);
+        user.changePassword(encodedPassword);
+    }
+
+    private User findUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(AuthErrorCode.USER_NOT_FOUND));
     }
 }

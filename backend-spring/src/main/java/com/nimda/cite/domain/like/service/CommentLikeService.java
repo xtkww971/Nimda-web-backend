@@ -1,5 +1,8 @@
 package com.nimda.cite.domain.like.service;
 
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.domain.CommentErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.domain.alarm.service.AlarmService;
 import com.nimda.cite.domain.comment.entity.Comment;
 import com.nimda.cite.domain.comment.repository.CommentRepository;
@@ -10,10 +13,8 @@ import com.nimda.cite.domain.notification.enums.NotificationType;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -29,9 +30,9 @@ public class CommentLikeService {
     @Transactional
     public String toggleCommentLike(Long userId, Long commentId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("댓글을 찾을 수 없습니다."));
+                .orElseThrow(() -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND));
 
         Optional<CommentLike> commentLike = commentLikeRepository.findByCommentAndUser(comment, user);
 
@@ -66,7 +67,7 @@ public class CommentLikeService {
     @Transactional(readOnly = true)
     public long getLikeCount(Long commentId) {
         Comment comment = commentRepository.findById(commentId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
+                () -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND)
         );
         return commentLikeRepository.countByCommentId(commentId);
     }
@@ -74,10 +75,10 @@ public class CommentLikeService {
     @Transactional(readOnly = true)
     public boolean isUserLiked(Long userId, Long commentId) {
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
+                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
         );
         Comment comment = commentRepository.findById(commentId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND)
+                () -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND)
         );
 
         return commentLikeRepository.existsByCommentIdAndUserId(commentId, userId);

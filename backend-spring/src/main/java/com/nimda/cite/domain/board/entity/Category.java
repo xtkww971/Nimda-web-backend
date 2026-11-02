@@ -1,5 +1,6 @@
 package com.nimda.cite.domain.board.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -19,7 +20,7 @@ import lombok.Setter;
  * - SEO 친화적 URL (slug)
  */
 @Entity
-@Table(name = "category")
+@Table(name = TableNames.categoryTable)
 @Getter
 @Setter
 @NoArgsConstructor

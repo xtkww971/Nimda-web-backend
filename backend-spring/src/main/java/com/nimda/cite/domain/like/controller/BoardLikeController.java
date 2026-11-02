@@ -5,59 +5,51 @@ import com.nimda.cite.domain.board.entity.Board;
 import com.nimda.cite.domain.comment.enums.STATUS;
 import com.nimda.cite.domain.comment.repository.CommentRepository;
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
+import com.nimda.cite.domain.like.dto.BoardLikeCountResponseDTO;
+import com.nimda.cite.domain.like.dto.BoardLikeListResponseDTO;
 import com.nimda.cite.domain.like.dto.BoardLikeResponse;
 import com.nimda.cite.domain.like.service.BoardLikeService;
-import com.nimda.cite.user.repository.UserRepository;
+import com.nimda.cite.user.entity.User;
+import com.nimda.cite.user.service.UserService;
 import com.nimda.cite.user.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Map;
 
 // 매핑 이름 바꿔야 함
 
 @RestController
-@RequestMapping("/api/like/board")
+@RequestMapping(UrlNames.boardLikeUrl)
 @RequiredArgsConstructor
 public class BoardLikeController {
 
     private final BoardLikeService boardLikeService;
     private final CommentRepository commentRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     /**
      * 타인의 좋아요한 게시글 목록 조회 (공개 프로필용, 인증 불필요)
      * GET /api/like/board/user/{nickname}/liked
      */
-    @GetMapping("/user/{nickname}/liked")
+    @GetMapping(UrlNames.getLikedBoardsByNicknameUrl)
     public ResponseEntity<?> getLikedBoardsByNickname(@PathVariable String nickname) {
-        try {
-            return userRepository.findByNickname(nickname)
-                    .map(user -> {
-                        List<Board> boards = boardLikeService.getTotalLikeBoards(user.getId());
-                        List<BoardResponseDTO> dtos = boards.stream()
-                                .map(b -> BoardResponseDTO.from(b,
-                                        boardLikeService.getLikeCount(b.getId()),
-                                        false,
-                                        commentRepository.countByBoardIdAndStatusNot(b.getId(), STATUS.DELETED)))
-                                .toList();
-                        return ApiResponse.ok(Map.of("boards", dtos)).toResponse();
-                    })
-                    .orElseThrow(() ->
-                            new ResponseStatusException(HttpStatus.NOT_FOUND));
-        } catch (Exception e) {
-            return ApiResponse.fail("조회 중 오류가 발생했습니다.")
-                    .toResponse(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        User user = userService.getUserByNickname(nickname);
+        List<Board> boards = boardLikeService.getTotalLikeBoards(user.getId());
+        List<BoardResponseDTO> dtos = boards.stream()
+                .map(b -> BoardResponseDTO.from(b,
+                        boardLikeService.getLikeCount(b.getId()),
+                        false,
+                        commentRepository.countByBoardIdAndStatusNot(b.getId(), STATUS.DELETED)))
+                .toList();
+        return ApiResponse.ok(BoardLikeListResponseDTO.of(dtos)).toResponse();
     }
 
     // 게시글 내에서 표기할 좋아요 개수와 좋아요 여부
-    @GetMapping("/{boardId}/likeStatus")
+    @GetMapping(UrlNames.getLikeStatusUrl)
     public ResponseEntity<?> getLikeStatus(
             @PathVariable Long boardId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -69,13 +61,13 @@ public class BoardLikeController {
         return ApiResponse.ok(dto).toResponse();
     }
 
-    @GetMapping("/{boardId}/likeCount")
+    @GetMapping(UrlNames.getBoardLikeCountUrl)
     public ResponseEntity<?> getLikeCount(@PathVariable Long boardId) {
         long likeCount = boardLikeService.getLikeCount(boardId);
         return ApiResponse.ok(BoardLikeResponse.builder().likeCount(likeCount).build()).toResponse();
     }
 
-    @PostMapping("/{boardId}")
+    @PostMapping(UrlNames.toggleBoardLikeUrl)
     public ResponseEntity<?> toggleLike(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long boardId) {
@@ -87,7 +79,7 @@ public class BoardLikeController {
         return ApiResponse.ok(BoardLikeResponse.of(message, likeCount, isLiked)).toResponse();
     }
 
-    @GetMapping("/totalLikes")
+    @GetMapping(UrlNames.getTotalLikesReceivedUrl)
     public ResponseEntity<?> getTotalLikesReceived(@AuthenticationPrincipal CustomUserDetails userDetails) {
         Long userId = userDetails.getUser().getId();
         long totalReceived = boardLikeService.getTotalLikesReceived(userId);
@@ -95,7 +87,7 @@ public class BoardLikeController {
         return ApiResponse.ok(dto).toResponse();
     }
 
-    @GetMapping("/pushedLikes")
+    @GetMapping(UrlNames.getLikeBoardsUrl)
     public ResponseEntity<?> getLikeBoards(@AuthenticationPrincipal CustomUserDetails userDetails) {
         Long userId = userDetails.getUser().getId();
         List<Board> boards = boardLikeService.getTotalLikeBoards(userId);
@@ -105,26 +97,17 @@ public class BoardLikeController {
                         true,
                         commentRepository.countByBoardIdAndStatusNot(b.getId(), STATUS.DELETED)))
                 .toList();
-        return ApiResponse.ok(Map.of("boards", dtos)).toResponse();
+        return ApiResponse.ok(BoardLikeListResponseDTO.of(dtos)).toResponse();
     }
 
-    @GetMapping("/pushedLikes/count")
+    @GetMapping(UrlNames.getPushedLikesCountUrl)
     public ResponseEntity<?> getPushedLikesCount(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Long userId = CustomUserDetails.getLoginUser(userDetails).getId();
 
-        if (userDetails == null) {
-            return ApiResponse.fail("로그인 정보가 없습니다.").toResponse(HttpStatus.UNAUTHORIZED);
-        }
+        long count = boardLikeService.countTotalLikeBoards(userId);
 
-        try {
-            Long userId = userDetails.getUser().getId();
-
-            long count = boardLikeService.countTotalLikeBoards(userId);
-
-            // 2. 프론트엔드 boardLike.ts의 'result.data?.count'와 맞추기 위해 "count"로 키값 설정
-            return ApiResponse.ok(Map.of("likeCount", count)).toResponse();
-        } catch (Exception e) {
-            return ApiResponse.fail("유효하지 않은 토큰입니다.").toResponse(HttpStatus.UNAUTHORIZED);
-        }
+        // 프론트엔드 boardLike.ts는 'result.data?.likeCount'로 읽는다.
+        return ApiResponse.ok(BoardLikeCountResponseDTO.of(count)).toResponse();
     }
 }

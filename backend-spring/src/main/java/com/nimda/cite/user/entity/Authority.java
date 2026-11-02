@@ -1,15 +1,13 @@
 package com.nimda.cite.user.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
-@Table(name = "authority")
+@Table(name = TableNames.authorityTable)
 @Getter
-@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Authority {
