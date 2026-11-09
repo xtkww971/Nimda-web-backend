@@ -18,7 +18,7 @@ public class ChallengeController {
 
     private final ChallengeService challengeService;
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createChallenge(@ModelAttribute @Valid AddChallengeRequest request) {
         Challenge challenge = challengeService.addChallenge(request);
