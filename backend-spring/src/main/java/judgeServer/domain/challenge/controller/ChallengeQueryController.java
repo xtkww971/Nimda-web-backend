@@ -24,9 +24,9 @@ import java.util.List;
  *   GET /api/ctf/challenges/{code}  -> 문제 상세
  * </pre>
  *
- * <p>등록/삭제/공개전환은 관리자용 {@link ChallengeController}(단수 경로 {@code /api/ctf/challenge})에
+ * <p>등록/삭제/공개전환은 관리자와 DEV용 {@link ChallengeController}(단수 경로 {@code /api/ctf/challenge})에
  * 있다. 조회를 복수 경로로 분리한 것은 시큐리티 규칙 때문이다. 단수 경로에는 "POST/DELETE는
- * 관리자만"이 걸려 있어서, 참가자용 조회를 같은 경로에 두면 규칙이 서로 얽힌다.
+ * 관리자와 DEV만"이 걸려 있어서, 참가자용 조회를 같은 경로에 두면 규칙이 서로 얽힌다.
  *
  * <p>비공개(초안) 문제는 출제 권한이 있는 관리자와 DEV에게만 보인다. 코드만 알면 열람되는 일이
  * 없도록, 없는 문제와 같은 404로 답한다.

@@ -158,13 +158,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/cite/category/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/cite/category/**").hasRole("ADMIN")
 
-                        // CTF 문제 api (등록은 관리자와 DEV, 삭제/공개전환은 관리자만)
-                        // 첨부파일 다운로드는 참가자가 쓰는 기능이라 아래 ADMIN 규칙보다 먼저 둔다
+                        // CTF 문제 api (등록/삭제/공개전환은 관리자와 DEV만)
+                        // 첨부파일 다운로드는 참가자가 쓰는 기능이라 아래 규칙보다 먼저 둔다
                         // (규칙은 먼저 걸리는 것이 이긴다).
-                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge").hasAnyRole("ADMIN", "DEV")
                         .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*/download").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
+                        .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
 
                         // [우선순위 7] 나머지 모든 요청은 기본적으로 인증 필요
                         .anyRequest().authenticated()

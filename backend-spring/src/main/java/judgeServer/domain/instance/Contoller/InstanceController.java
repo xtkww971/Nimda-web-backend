@@ -103,11 +103,11 @@ public class InstanceController {
         return instanceService.view(uuid, request.getScheme(), request.getServerPort());
     }
 
-    // 비공개 문제(초안)는 관리자만. 코드만 알면 인스턴스를 띄울 수 있으면 안 된다.
+    // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 인스턴스를 띄울 수 있으면 안 된다.
     private Challenge findChallenge(String code, CustomUserDetails user) {
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !isAdmin(user)) {
+        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
         return challenge;
@@ -120,12 +120,12 @@ public class InstanceController {
         return user.getUser().getId();
     }
 
-    private boolean isAdmin(CustomUserDetails user) {
+    private boolean canAccessDrafts(CustomUserDetails user) {
         if (user == null) {
             return false;
         }
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
     }
 }

@@ -27,13 +27,13 @@ public class ChallengeController {
         return ApiResponse.ok(challenge.getId()).toResponse();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
     @PostMapping("/toggle-public/{id}")
     public ResponseEntity<?> toggleIsPublic(@PathVariable Long id) {
         return ApiResponse.ok(challengeService.toggleIsPublic(id)).toResponse();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteChallenge(@PathVariable Long id) {
         challengeService.deleteChallenge(id);

@@ -42,8 +42,8 @@ public class ChallengeDownloadController {
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 
-        // 비공개 문제(초안)는 관리자만. 코드만 알면 받아갈 수 있으면 안 된다.
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !isAdmin(user)) {
+        // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 받아갈 수 있으면 안 된다.
+        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
         // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
@@ -145,12 +145,12 @@ public class ChallengeDownloadController {
         return user.getUser().getId();
     }
 
-    private boolean isAdmin(CustomUserDetails user) {
+    private boolean canAccessDrafts(CustomUserDetails user) {
         if (user == null) {
             return false;
         }
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
     }
 }
