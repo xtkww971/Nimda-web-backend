@@ -148,6 +148,9 @@ public class AuthController {
                 .profileImage(profileImageUrl)
                 .profileDecoration(user.getProfileDecoration())
                 .emailHide(user.isEmailHide())
+                .roles(user.getAuthorities().stream()
+                        .map(authority -> authority.getAuthorityName())
+                        .toList())
                 .build();
 
         return ResponseEntity.ok(response);
