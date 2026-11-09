@@ -1,8 +1,8 @@
 package judgeServer.domain.challenge.download;
 
-import judgeServer.domain.challenge.mq.consumer.CtfResultConsumer;
-import judgeServer.domain.challenge.mq.message.CtfResultMessage;
-import judgeServer.domain.challenge.mq.stream.StreamResultStore;
+import redis.mq.consumer.CtfResultConsumer;
+import redis.mq.message.CtfResultMessage;
+import redis.mq.stream.StreamResultStore;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 

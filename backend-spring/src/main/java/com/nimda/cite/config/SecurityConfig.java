@@ -1,9 +1,10 @@
 package com.nimda.cite.config;
 
-import judgeServer.domain.challenge.instance.Config.InstanceProperties;
-import judgeServer.domain.challenge.instance.Proxy.InstanceProxy;
-import judgeServer.domain.challenge.instance.Proxy.SubdomainInstanceProxyFilter;
-import judgeServer.domain.challenge.instance.Repository.InstanceResultStore;
+import judgeServer.config.InstanceProperties;
+import judgeServer.domain.instance.Proxy.InstanceProxy;
+import judgeServer.domain.instance.Proxy.SubdomainInstanceProxyFilter;
+import judgeServer.domain.instance.Repository.InstanceResultStore;
+import redis.mq.producer.RedisCtfRequestProducer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -39,7 +40,7 @@ public class SecurityConfig {
     private InstanceProxy instanceProxy;
     // 결과 메시지에 userId가 없어져서, 소유권 확인은 발행 시 남긴 uuid → 사용자 매핑으로 한다.
     @Autowired
-    private judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer ctfRequestProducer;
+    private RedisCtfRequestProducer ctfRequestProducer;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
