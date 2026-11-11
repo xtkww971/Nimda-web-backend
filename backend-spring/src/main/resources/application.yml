@@ -111,6 +111,8 @@ ctf:
     # 플래그 제출 큐. 백엔드 안에서 발행하고 소비한다.
     flag-stream-key: ${CTF_QUEUE_FLAG_STREAM_KEY:ctf:flag:submissions}
     flag-consumer-group: ${CTF_QUEUE_FLAG_CONSUMER_GROUP:ctf-flag-judges}
+    # CTF 서버 가용성 신호. provisioner가 10초마다 TTL 30초로 쓴다. CTF_HEARTBEAT_KEY와 같아야 한다.
+    heartbeat-key: ${CTF_HEARTBEAT_KEY:ctf:server:heartbeat}
   # todo 인스턴스 서브도메인 접근 로직 단순화
   instance:
     base-domain: ${CTF_INSTANCE_BASE_DOMAIN:}

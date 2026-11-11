@@ -21,4 +21,8 @@ public class CtfQueueProperties {
     // 플래그 제출을 채점기로 넘기는 스트림. 백엔드 안에서 발행하고 소비한다.
     private String flagStreamKey = "ctf:flag:submissions";
     private String flagConsumerGroup = "ctf-flag-judges";
+
+    // CTF 서버(provisioner)가 살아 있으면 TTL을 걸어 계속 갱신하는 키 (CTF 레포 ADR-0022).
+    // provisioner의 CTF_HEARTBEAT_KEY와 같아야 한다. 다르면 서버가 떠 있어도 항상 꺼진 것으로 보인다.
+    private String heartbeatKey = "ctf:server:heartbeat";
 }
