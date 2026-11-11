@@ -1,5 +1,6 @@
 package judgeServer.domain.challenge.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -34,8 +35,17 @@ public class AddChallengeRequest {
     @NotNull(message = "분류는 필수입니다.")
     private ChallengeCategory category;
 
-    /** 미지정 시 엔티티 기본값(100)을 쓴다. */
-    private Integer points;
+    /** 첫 번째 해결자가 받는 점수. 미지정 시 100 */
+    @Min(value = 0, message = "최대 점수는 0 이상이어야 합니다.")
+    private Integer maxPoint;
+
+    /** 내려갈 수 있는 최저 점수. 최대 점수보다 클 수 없다. 미지정 시 0 */
+    @Min(value = 0, message = "최소 점수는 0 이상이어야 합니다.")
+    private Integer minPoint;
+
+    /** 해결자 한 명당 깎이는 점수. 미지정 시 10 */
+    @Min(value = 0, message = "감소 점수는 0 이상이어야 합니다.")
+    private Integer decreasePoint;
 
     /** 미지정 시 STATIC */
     private FlagType flagType;
