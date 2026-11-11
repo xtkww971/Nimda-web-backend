@@ -1,9 +1,9 @@
 package com.nimda.cite.domain.board.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.NotAllowFormException;
 import com.nimda.cite.common.exception.NotFoundException;
 import com.nimda.cite.common.exception.NotIncludeRoleException;
-import com.nimda.cite.common.exception.errorcode.domain.AttachmentErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -42,7 +42,7 @@ public class FileDownloadService {
         // 단, 파일명에는 언더스코어(_)가 포함될 수 있으므로 제외
         if (fileName.contains("..") || fileName.startsWith("/") || fileName.startsWith("\\")) {
             logger.warn("Path Traversal 시도 감지: {}", fileName);
-            throw new NotAllowFormException(AttachmentErrorCode.INVALID_FILE_NAME);
+            throw new NotAllowFormException(ErrorCode.INVALID_FILE_NAME);
         }
 
         // ========== [파일 경로 구성] ==========
@@ -55,19 +55,19 @@ public class FileDownloadService {
         Path uploadDirPath = Paths.get(UPLOAD_DIR).normalize();
         if (!filePath.startsWith(uploadDirPath)) {
             logger.warn("업로드 디렉토리 외부 접근 시도: {}", filePath);
-            throw new NotIncludeRoleException(AttachmentErrorCode.INVALID_FILE_PATH);
+            throw new NotIncludeRoleException(ErrorCode.INVALID_FILE_PATH);
         }
 
         // ========== [파일 존재 확인] ==========
         if (!file.exists() || !file.isFile()) {
             logger.warn("파일을 찾을 수 없음: {}", filePath);
-            throw new NotFoundException(AttachmentErrorCode.FILE_NOT_FOUND);
+            throw new NotFoundException(ErrorCode.FILE_NOT_FOUND);
         }
 
         // ========== [파일 읽기 권한 확인] ==========
         if (!file.canRead()) {
             logger.warn("파일 읽기 권한 없음: {}", filePath);
-            throw new NotIncludeRoleException(AttachmentErrorCode.FILE_READ_FORBIDDEN);
+            throw new NotIncludeRoleException(ErrorCode.FILE_READ_FORBIDDEN);
         }
 
         return file;

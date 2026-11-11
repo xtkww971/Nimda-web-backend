@@ -1,11 +1,9 @@
 package com.nimda.cite.domain.comment.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.InvalidStateException;
 import com.nimda.cite.common.exception.NotFoundException;
 import com.nimda.cite.common.exception.NotIncludeRoleException;
-import com.nimda.cite.common.exception.errorcode.domain.BoardErrorCode;
-import com.nimda.cite.common.exception.errorcode.domain.CommentErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.domain.alarm.Event.AddChildCommentEvent;
 import com.nimda.cite.domain.alarm.Event.AddCommentEvent;
 import com.nimda.cite.domain.board.entity.Board;
@@ -57,26 +55,26 @@ public class CommentService {
         // 연관 엔티티 조회
         // 게시글
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.BOARD_NOT_FOUND));
 
         // 작성자
         User author = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
         // 부모 댓글 조회
         Comment parent = null;
         if (request.getParentId() != null && request.getParentId() > 0) {
             parent = commentRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new NotFoundException(CommentErrorCode.PARENT_COMMENT_NOT_FOUND));
+                    .orElseThrow(() -> new NotFoundException(ErrorCode.PARENT_COMMENT_NOT_FOUND));
 
             // 깊이 제한: 부모 댓글이 이미 대댓글인지 확인
             if (parent.getParent() != null) {
-                throw new InvalidStateException(CommentErrorCode.REPLY_DEPTH_EXCEEDED);
+                throw new InvalidStateException(ErrorCode.REPLY_DEPTH_EXCEEDED);
             }
 
             // 상태 확인: 부모 댓글 삭제 여부 확인
             if (parent.getStatus() == STATUS.DELETED) {
-                throw new InvalidStateException(CommentErrorCode.PARENT_COMMENT_DELETED);
+                throw new InvalidStateException(ErrorCode.PARENT_COMMENT_DELETED);
             }
         }
 
@@ -160,7 +158,7 @@ public class CommentService {
     public List<MyCommentResponse> getMyComments(Long userId) {
         // 작성자
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
         List<Comment> comments = commentRepository.findByMyComments(user, List.of(STATUS.DELETED));
 
@@ -173,7 +171,7 @@ public class CommentService {
     @Transactional(readOnly = true)
     public List<MyCommentResponse> getCommentsByNickname(String nickname) {
         User user = userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
         return getMyComments(user.getId());
     }
@@ -184,10 +182,10 @@ public class CommentService {
     public CommentResponse updateCommentStatus(Long commentId, CommentStatusUpdateRequest request) {
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
         if (comment.getStatus() == STATUS.DELETED) {
-            throw new InvalidStateException(CommentErrorCode.DELETED_COMMENT_STATUS_CHANGE);
+            throw new InvalidStateException(ErrorCode.DELETED_COMMENT_STATUS_CHANGE);
         }
 
         comment.updateStatus(request.getStatus());
@@ -199,14 +197,14 @@ public class CommentService {
     public CommentResponse updateComment(Long commentId, CommentUpdateRequest request, Long userId) {
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
         if(!comment.getAuthor().getId().equals(userId)) {
-            throw new NotIncludeRoleException(CommentErrorCode.COMMENT_UPDATE_FORBIDDEN);
+            throw new NotIncludeRoleException(ErrorCode.COMMENT_UPDATE_FORBIDDEN);
         }
 
         if (comment.getStatus() == STATUS.DELETED) {
-            throw new InvalidStateException(CommentErrorCode.DELETED_COMMENT_UPDATE);
+            throw new InvalidStateException(ErrorCode.DELETED_COMMENT_UPDATE);
         }
 
         comment.updateContext(request.getContext());
@@ -222,14 +220,14 @@ public class CommentService {
     public void deleteComment(Long commentId, Long userId) {
 
         Comment comment = commentRepository.findWithAuthorById(commentId)
-                .orElseThrow(() -> new NotFoundException(CommentErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new NotIncludeRoleException(CommentErrorCode.COMMENT_DELETE_FORBIDDEN);
+            throw new NotIncludeRoleException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
         }
 
         if (comment.getStatus() == STATUS.DELETED) {
-            throw new InvalidStateException(CommentErrorCode.COMMENT_ALREADY_DELETED);
+            throw new InvalidStateException(ErrorCode.COMMENT_ALREADY_DELETED);
         }
 
         comment.updateStatus(STATUS.DELETED);
@@ -238,7 +236,7 @@ public class CommentService {
     @Transactional
     public void deleteMyComments(List<Long> commentIds, Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
         commentRepository.deleteAllByIdInAndAuthor(commentIds, user);
     }
@@ -252,7 +250,7 @@ public class CommentService {
     @Transactional(readOnly = true)
     public List<Long> getCommentedBoardIds(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
         return commentRepository.findDistinctBoardIdsByAuthor(user, List.of(STATUS.DELETED));
     }

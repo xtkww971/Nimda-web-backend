@@ -1,7 +1,7 @@
 package com.nimda.cite.user.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.user.AdminUserErrorCode;
 import com.nimda.cite.config.CheckConfig;
 import com.nimda.cite.user.dto.adminuser.AdminUserDetailResponseDTO;
 import com.nimda.cite.user.dto.adminuser.AdminUserListResponseDTO;
@@ -56,7 +56,7 @@ public class AdminUserService {
         CheckConfig.npeAndNegativeCheck(userId, "userId");
 
         return AdminUserDetailResponseDTO.from(userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND)));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ADMIN_USER_NOT_FOUND)));
     }
 
     /**
@@ -94,14 +94,14 @@ public class AdminUserService {
         CheckConfig.npeAndNegativeCheck(userId, "userId");
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ADMIN_USER_NOT_FOUND));
 
         // status를 APPROVED로 변경
         user.changeStatus(ApprovalStatus.APPROVED);
 
         // ROLE_USER 권한 부여 (이미 권한이 있으면 추가하지 않음)
         Authority userRole = authorityRepository.findByAuthorityName("ROLE_USER")
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_ROLE_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_ROLE_NOT_FOUND));
 
         user.addAuthority(userRole);
 
@@ -117,7 +117,7 @@ public class AdminUserService {
         CheckConfig.npeAndNegativeCheck(userId, "userId");
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ADMIN_USER_NOT_FOUND));
 
         // status를 REJECTED로 변경
         user.changeStatus(ApprovalStatus.REJECTED);
@@ -150,11 +150,11 @@ public class AdminUserService {
         }
 
         Authority authority = authorityRepository.findByAuthorityName(normalized)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.AUTHORITY_NOT_EXIST));
 
         // 2. 사용자 및 권한 존재 여부 확인
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ADMIN_USER_NOT_FOUND));
 
         // 3. 권한 추가(중복 체크가 내부 메서드에 구현되어 있음)
         user.addAuthority(authority);
@@ -176,10 +176,10 @@ public class AdminUserService {
         }
 
         Authority authority = authorityRepository.findByAuthorityName(normalized)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.AUTHORITY_NOT_EXIST));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(AdminUserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ADMIN_USER_NOT_FOUND));
 
         user.removeAuthority(authority);
 

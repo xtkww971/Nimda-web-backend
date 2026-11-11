@@ -1,9 +1,8 @@
 package com.nimda.cite.domain.profiledecoration.ownership;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.NotAllowFormException;
 import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.ProfileDecorationErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
@@ -28,14 +27,14 @@ public class ProfileDecorationOwnershipService {
     @Transactional
     public void grant(Long userId, ProfileDecoration profileDecoration) {
         if (profileDecoration == null || !profileDecoration.isActive()) {
-            throw new NotAllowFormException(ProfileDecorationErrorCode.BADGE_NOT_USABLE);
+            throw new NotAllowFormException(ErrorCode.BADGE_NOT_USABLE);
         }
         if (owns(userId, profileDecoration.getId())) {
             return;
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
         repository.save(new UserProfileDecoration(user, profileDecoration));
     }
 
@@ -49,7 +48,7 @@ public class ProfileDecorationOwnershipService {
     public void revokeByStudentNum(String studentNum, ProfileDecoration profileDecoration) {
         User user = findUserByStudentNum(studentNum);
         if (profileDecoration == null) {
-            throw new NotFoundException(ProfileDecorationErrorCode.BADGE_NOT_FOUND);
+            throw new NotFoundException(ErrorCode.BADGE_NOT_FOUND);
         }
         repository.deleteByUserIdAndProfileDecorationId(user.getId(), profileDecoration.getId());
         if (profileDecoration.getKey().equals(user.getProfileDecoration())) {
@@ -64,9 +63,9 @@ public class ProfileDecorationOwnershipService {
 
     private User findUserByStudentNum(String studentNum) {
         if (studentNum == null || studentNum.isBlank()) {
-            throw new NotAllowFormException(ProfileDecorationErrorCode.STUDENT_NUM_REQUIRED);
+            throw new NotAllowFormException(ErrorCode.STUDENT_NUM_REQUIRED);
         }
         return userRepository.findByStudentNum(studentNum.trim())
-                .orElseThrow(() -> new NotFoundException(ProfileDecorationErrorCode.STUDENT_NUM_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.STUDENT_NUM_NOT_FOUND));
     }
 }

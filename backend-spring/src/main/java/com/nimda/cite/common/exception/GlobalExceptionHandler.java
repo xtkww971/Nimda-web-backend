@@ -1,8 +1,6 @@
 package com.nimda.cite.common.exception;
 
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.errorcode.common.CommonErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -26,7 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  *
  * 모든 에러 응답은 ApiResponse.fail(message) 형식으로 통일한다.
  * - 비즈니스 예외 : GlobalNimdaException(ErrorCode) → ErrorCode의 status / message 사용
- * - 예상하지 못한 예외 : 내부 메시지를 노출하지 않고 CommonErrorCode.INTERNAL_SERVER_ERROR 메시지로 응답
+ * - 예상하지 못한 예외 : 내부 메시지를 노출하지 않고 ErrorCode.INTERNAL_SERVER_ERROR 메시지로 응답
  */
 
 @Slf4j
@@ -37,8 +35,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Spring MVC Exception : {} - {}", statusCode.value(), ex.getMessage());
 
         ErrorCode errorCode = statusCode.is5xxServerError()
-                ? CommonErrorCode.INTERNAL_SERVER_ERROR
-                : CommonErrorCode.INVALID_INPUT;
+                ? ErrorCode.INTERNAL_SERVER_ERROR
+                : ErrorCode.INVALID_INPUT;
 
         return ResponseEntity
                 .status(statusCode)
@@ -52,12 +50,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
-                .orElse(CommonErrorCode.INVALID_INPUT.getMessage());
+                .orElse(ErrorCode.INVALID_INPUT.getMessage());
 
-        log.warn("Nimda Validation Exception : {} - {}", CommonErrorCode.INVALID_INPUT.getErrorNum(), message);
+        log.warn("Nimda Validation Exception : {} - {}", ErrorCode.INVALID_INPUT.getErrorNum(), message);
 
         return ResponseEntity
-                .status(CommonErrorCode.INVALID_INPUT.getHttpStatus())
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
                 .body(ApiResponse.fail(message));
     }
 
@@ -77,20 +75,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException e){
-        log.warn("Nimda Access Denied : {} - {}", CommonErrorCode.ACCESS_DENIED.getErrorNum(), e.getMessage());
+        log.warn("Nimda Access Denied : {} - {}", ErrorCode.ACCESS_DENIED.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(CommonErrorCode.ACCESS_DENIED.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.ACCESS_DENIED.getMessage()));
+                .status(ErrorCode.ACCESS_DENIED.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.ACCESS_DENIED.getMessage()));
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException e){
-        log.warn("Nimda Authentication Exception : {} - {}", AuthErrorCode.CANNOT_AUTHORIZED.getErrorNum(), e.getMessage());
+        log.warn("Nimda Authentication Exception : {} - {}", ErrorCode.CANNOT_AUTHORIZED.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(AuthErrorCode.CANNOT_AUTHORIZED.getHttpStatus())
-                .body(ApiResponse.fail(AuthErrorCode.CANNOT_AUTHORIZED.getMessage()));
+                .status(ErrorCode.CANNOT_AUTHORIZED.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.CANNOT_AUTHORIZED.getMessage()));
     }
 
     /**
@@ -98,11 +96,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException e){
-        log.warn("Nimda Invalid Input : {} - {}", CommonErrorCode.INVALID_INPUT.getErrorNum(), e.getMessage());
+        log.warn("Nimda Invalid Input : {} - {}", ErrorCode.INVALID_INPUT.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(CommonErrorCode.INVALID_INPUT.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.INVALID_INPUT.getMessage()));
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
@@ -110,8 +108,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("Unhandled Exception : ", e);
 
         return ResponseEntity
-                .status(CommonErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
     }
 
     /**

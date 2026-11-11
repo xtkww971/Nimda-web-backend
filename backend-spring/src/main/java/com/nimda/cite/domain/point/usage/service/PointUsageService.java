@@ -1,11 +1,10 @@
 package com.nimda.cite.domain.point.usage.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.AlreadyExistException;
 import com.nimda.cite.common.exception.InvalidStateException;
 import com.nimda.cite.common.exception.NotAllowFormException;
 import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.BoardErrorCode;
-import com.nimda.cite.common.exception.errorcode.domain.PointErrorCode;
 import com.nimda.cite.domain.board.entity.Board;
 import com.nimda.cite.domain.board.enums.BoardStatus;
 import com.nimda.cite.domain.board.enums.ShopItemType;
@@ -35,7 +34,7 @@ public class PointUsageService {
     @Transactional
     public PointUsageResponse purchaseBoardItem(Long userId, Long boardId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.BOARD_NOT_FOUND));
 
         validatePurchasable(board);
         validateNotAlreadyOwned(userId, board);
@@ -59,16 +58,16 @@ public class PointUsageService {
 
     private void validatePurchasable(Board board) {
         if (board.getStatus() != BoardStatus.ACTIVE) {
-            throw new InvalidStateException(PointErrorCode.ITEM_NOT_PURCHASABLE);
+            throw new InvalidStateException(ErrorCode.ITEM_NOT_PURCHASABLE);
         }
         if (board.getCategory() == null || !Boolean.TRUE.equals(board.getCategory().getShopEnabled())) {
-            throw new NotAllowFormException(PointErrorCode.NOT_SHOP_ITEM);
+            throw new NotAllowFormException(ErrorCode.NOT_SHOP_ITEM);
         }
         if (board.getItemPrice() == null || board.getItemPrice() <= 0) {
-            throw new InvalidStateException(PointErrorCode.ITEM_PRICE_NOT_SET);
+            throw new InvalidStateException(ErrorCode.ITEM_PRICE_NOT_SET);
         }
         if (resolveItemType(board) == ShopItemType.BADGE && board.getProfileDecoration() == null) {
-            throw new InvalidStateException(PointErrorCode.ITEM_BADGE_NOT_LINKED);
+            throw new InvalidStateException(ErrorCode.ITEM_BADGE_NOT_LINKED);
         }
     }
 
@@ -79,7 +78,7 @@ public class PointUsageService {
 
         ProfileDecoration decoration = board.getProfileDecoration();
         if (profileDecorationOwnershipService.owns(userId, decoration.getId())) {
-            throw new AlreadyExistException(PointErrorCode.BADGE_ALREADY_OWNED);
+            throw new AlreadyExistException(ErrorCode.BADGE_ALREADY_OWNED);
         }
     }
 
@@ -99,15 +98,15 @@ public class PointUsageService {
 
     private UserBalance spendBalance(Long userId, String description, Long pointAmount) {
         if (pointAmount == null || pointAmount <= 0) {
-            throw new NotAllowFormException(PointErrorCode.INVALID_SPEND_AMOUNT);
+            throw new NotAllowFormException(ErrorCode.INVALID_SPEND_AMOUNT);
         }
 
         UserBalance balance = userBalanceRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(PointErrorCode.BALANCE_NOT_FOUND)
+                () -> new NotFoundException(ErrorCode.BALANCE_NOT_FOUND)
         );
 
         if (balance.getTotalAmount() < pointAmount) {
-            throw new InvalidStateException(PointErrorCode.INSUFFICIENT_BALANCE);
+            throw new InvalidStateException(ErrorCode.INSUFFICIENT_BALANCE);
         }
 
         balance.setUpdatedAt(LocalDateTime.now());

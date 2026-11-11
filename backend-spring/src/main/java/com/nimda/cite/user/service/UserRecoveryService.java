@@ -1,7 +1,7 @@
 package com.nimda.cite.user.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.UnauthorizedException;
-import com.nimda.cite.common.exception.errorcode.user.UserRecoveryErrorCode;
 import com.nimda.cite.common.util.JwtUtil;
 import com.nimda.cite.common.util.MailLimitExceededException;
 import com.nimda.cite.common.util.MailService;
@@ -69,12 +69,12 @@ public class UserRecoveryService {
     public String verifyAuthCode(String token, String authCode) {
         // 1. 토큰이 유효한지 먼저 체크하고, 토큰 내부에 저장된 이메일을 꺼냅니다.
         if (!tokenProvider.validateToken(token)) {
-            throw new UnauthorizedException(UserRecoveryErrorCode.RECOVERY_SESSION_EXPIRED);
+            throw new UnauthorizedException(ErrorCode.RECOVERY_SESSION_EXPIRED);
         }
 
         String emailFromToken = jwtUtil.extractClaimByKey(token, "email");
         if (!mailService.verifyCode(emailFromToken, authCode)) {
-            throw new UnauthorizedException(UserRecoveryErrorCode.AUTH_CODE_MISMATCH);
+            throw new UnauthorizedException(ErrorCode.AUTH_CODE_MISMATCH);
         }
 
         String userId = jwtUtil.extractClaimByKey(token, "userId");
@@ -85,14 +85,14 @@ public class UserRecoveryService {
     // 비밀번호 변경 토큰을 검증하고, 토큰에 담긴 userId를 반환한다.
     public String validatePasswordChangeToken(String token) {
         if (!tokenProvider.validateToken(token)) {
-            throw new UnauthorizedException(UserRecoveryErrorCode.RECOVERY_SESSION_EXPIRED);
+            throw new UnauthorizedException(ErrorCode.RECOVERY_SESSION_EXPIRED);
         }
 
         Boolean isEmailVerified =
                 jwtUtil.extractClaim(token, claims -> claims.get("isEmailVerified", Boolean.class));
         if (isEmailVerified == null || !isEmailVerified) {
             // 인증하지 않고 우회한 경우
-            throw new UnauthorizedException(UserRecoveryErrorCode.EMAIL_NOT_VERIFIED);
+            throw new UnauthorizedException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
 
         return jwtUtil.extractId(token);

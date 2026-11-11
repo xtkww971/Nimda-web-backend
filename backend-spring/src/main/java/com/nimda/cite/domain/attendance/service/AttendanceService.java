@@ -1,9 +1,8 @@
 package com.nimda.cite.domain.attendance.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.InvalidStateException;
 import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.AttendanceErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.domain.attendance.entity.Attendance;
 import com.nimda.cite.domain.attendance.repositroy.AttendanceRepositroy;
 import com.nimda.cite.domain.attendance.entity.AttendanceLog;
@@ -32,7 +31,7 @@ public class AttendanceService {
         Attendance attendance = attendanceRepository.findByIdForUpdate(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                            .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
 
                     // 새로운 출석부 생성 및 저장
                     Attendance newAttendance = new Attendance(user);
@@ -46,7 +45,7 @@ public class AttendanceService {
         // 중복 체크
         if ((attendance.getLastDate() != null && attendance.getLastDate().equals(today))
                 || logRepository.existsByUserIdAndAttendanceDateBetween(userId, start, end)) {
-            throw new InvalidStateException(AttendanceErrorCode.ALREADY_CHECKED_IN);
+            throw new InvalidStateException(ErrorCode.ALREADY_CHECKED_IN);
         }
 
         // 상태 업데이트 (totalCount 증가, lastDate 갱신 등)
@@ -84,7 +83,7 @@ public class AttendanceService {
 
     public Attendance getUserAttendance(Long userId) {
         return attendanceRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(AttendanceErrorCode.ATTENDANCE_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ATTENDANCE_NOT_FOUND));
     }
 
     // 사용자별 상세 출석 로그 조회 (최근순)

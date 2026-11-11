@@ -1,7 +1,7 @@
 package com.nimda.cite.user.security;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.UnauthorizedException;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.user.entity.User;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,7 +28,7 @@ public class CustomUserDetails implements UserDetails {
     // getLoginUser - @AuthenticationPrincipal로 받은 로그인 정보에서 User를 꺼낸다. (로그인 정보가 없으면 401)
     public static User getLoginUser(CustomUserDetails userDetails) {
         if (userDetails == null || userDetails.getUser() == null) {
-            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
         return userDetails.getUser();
     }

@@ -1,13 +1,12 @@
 package com.nimda.cite.domain.board.service;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.exception.AlreadyExistException;
 import com.nimda.cite.common.exception.InvalidStateException;
 import com.nimda.cite.common.exception.NotAllowFormException;
 import com.nimda.cite.common.exception.NotFoundException;
 import com.nimda.cite.common.exception.NotIncludeRoleException;
 import com.nimda.cite.common.exception.UnauthorizedException;
-import com.nimda.cite.common.exception.errorcode.domain.CategoryErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.domain.board.dto.CategoryCreateDTO;
 import com.nimda.cite.domain.board.dto.CategorySortOrderDTO;
 import com.nimda.cite.domain.board.dto.CategoryUpdateDTO;
@@ -72,7 +71,7 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public Category getCategoryBySlug(String slug) {
         return categoryRepository.findBySlugAndIsActiveTrue(slug)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
     }
 
     /**
@@ -83,7 +82,7 @@ public class CategoryService {
     private void checkAdminAuthority(User user) {
 
         if (user == null) {
-            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
 
         // User의 authorities에서 ROLE_ADMIN 권한 확인
@@ -91,7 +90,7 @@ public class CategoryService {
                 .anyMatch(authority -> authority.getAuthorityName().equals("ROLE_ADMIN"));
 
         if (!isAdmin) {
-            throw new NotIncludeRoleException(CategoryErrorCode.ADMIN_REQUIRED);
+            throw new NotIncludeRoleException(ErrorCode.ADMIN_REQUIRED);
         }
     }
 
@@ -149,7 +148,7 @@ public class CategoryService {
 
         // #1. 업데이트할 카테고리 탐색
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. Slug 중복 체크
         if (updateDTO.getSlug() != null && !updateDTO.getSlug().equals(category.getSlug())) {
@@ -163,7 +162,7 @@ public class CategoryService {
 
             // 자기 자신을 부모로 설정하는 것 방지
             if (newParentId.equals(id)) {
-                throw new NotAllowFormException(CategoryErrorCode.SELF_PARENT_NOT_ALLOWED);
+                throw new NotAllowFormException(ErrorCode.SELF_PARENT_NOT_ALLOWED);
             }
 
             // 부모 존재 및 활성화 확인
@@ -171,7 +170,7 @@ public class CategoryService {
 
             // 순환 참조 방지 체크
             if (hasCircularReference(id, newParentId)) {
-                throw new NotAllowFormException(CategoryErrorCode.CIRCULAR_REFERENCE);
+                throw new NotAllowFormException(ErrorCode.CIRCULAR_REFERENCE);
             }
 
             category.setParentId(newParentId);
@@ -216,18 +215,18 @@ public class CategoryService {
 
         // 1. 카테고리 존재 확인
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. 자식 카테고리 존재 확인
         List<Category> children = categoryRepository.findByParentIdAndIsActiveTrueOrderBySortOrderAsc(id);
         if (!children.isEmpty()) {
-            throw new InvalidStateException(CategoryErrorCode.HAS_CHILD_CATEGORY);
+            throw new InvalidStateException(ErrorCode.HAS_CHILD_CATEGORY);
         }
 
         // 3. 게시글 존재 확인 (간단 체크: postCount 필드 활용)
         if (category.getPostCount() != null && category.getPostCount() > 0) {
-            throw new InvalidStateException(CategoryErrorCode.HAS_POSTS,
-                    CategoryErrorCode.HAS_POSTS.getMessage() + " (" + category.getPostCount() + "개)");
+            throw new InvalidStateException(ErrorCode.HAS_POSTS,
+                    ErrorCode.HAS_POSTS.getMessage() + " (" + category.getPostCount() + "개)");
         }
 
         // 4. 소프트 삭제 (isActive = false)
@@ -256,7 +255,7 @@ public class CategoryService {
     @Transactional
     public Category setShopEnabled(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         category.setShopEnabled(true);
         return category;
@@ -286,7 +285,7 @@ public class CategoryService {
                     return;
                 }
             }
-            throw new AlreadyExistException(CategoryErrorCode.SLUG_ALREADY_EXIST);
+            throw new AlreadyExistException(ErrorCode.SLUG_ALREADY_EXIST);
         }
     }
 
@@ -299,14 +298,14 @@ public class CategoryService {
     private void validateParent(Long parentId) {
 
         Category parent = categoryRepository.findById(parentId)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.PARENT_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.PARENT_NOT_FOUND));
 
         if (!parent.getIsActive()) {
-            throw new NotAllowFormException(CategoryErrorCode.INACTIVE_PARENT);
+            throw new NotAllowFormException(ErrorCode.INACTIVE_PARENT);
         }
 
         if (parent.getParentId() != null) {
-            throw new NotAllowFormException(CategoryErrorCode.MAX_DEPTH_EXCEEDED);
+            throw new NotAllowFormException(ErrorCode.MAX_DEPTH_EXCEEDED);
         }
     }
 
