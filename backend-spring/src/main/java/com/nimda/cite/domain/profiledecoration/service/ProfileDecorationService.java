@@ -1,10 +1,7 @@
 package com.nimda.cite.domain.profiledecoration.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.ExternalServiceException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
 import com.nimda.cite.common.s3.S3Service;
 import com.nimda.cite.domain.profiledecoration.repository.ProfileDecorationRepository;
 import com.nimda.cite.domain.profiledecoration.dto.ProfileDecorationCreateRequest;
@@ -39,16 +36,16 @@ public class ProfileDecorationService {
     @Transactional(readOnly = true)
     public ProfileDecoration getByKey(String key) {
         return repository.findByKey(key)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.DECORATION_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.DECORATION_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
     public ProfileDecoration getById(Long id) {
         if (id == null) {
-            throw new NotAllowFormException(ErrorCode.DECORATION_ID_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.DECORATION_ID_REQUIRED);
         }
         return repository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.BADGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.BADGE_NOT_FOUND));
     }
 
     /**
@@ -64,7 +61,7 @@ public class ProfileDecorationService {
         }
 
         if (s3Service == null) {
-            throw new ExternalServiceException(ErrorCode.IMAGE_SERVICE_UNAVAILABLE);
+            throw new GlobalNimdaException(ErrorCode.IMAGE_SERVICE_UNAVAILABLE);
         }
 
         return s3Service.createPresignedGetUrl(filePath, 60, "inline");
@@ -79,21 +76,21 @@ public class ProfileDecorationService {
         boolean purchaseRequired = true;
 
         if (key.isBlank()) {
-            throw new NotAllowFormException(ErrorCode.BADGE_KEY_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.BADGE_KEY_REQUIRED);
         }
         if (!key.matches("^[a-z0-9][a-z0-9-]{1,98}$")) {
-            throw new NotAllowFormException(ErrorCode.BADGE_KEY_INVALID);
+            throw new GlobalNimdaException(ErrorCode.BADGE_KEY_INVALID);
         }
         if (label.isBlank()) {
-            throw new NotAllowFormException(ErrorCode.BADGE_LABEL_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.BADGE_LABEL_REQUIRED);
         }
         if (filePath.isBlank()) {
-            throw new NotAllowFormException(ErrorCode.BADGE_IMAGE_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.BADGE_IMAGE_REQUIRED);
         }
         ProfileDecoration existing = repository.findByKey(key).orElse(null);
         if (existing != null) {
             if (existing.isActive()) {
-                throw new AlreadyExistException(ErrorCode.BADGE_KEY_ALREADY_EXIST);
+                throw new GlobalNimdaException(ErrorCode.BADGE_KEY_ALREADY_EXIST);
             }
             existing.update(label, filePath, requiredRole, true);
             existing.setPurchaseRequired(purchaseRequired);
@@ -109,7 +106,7 @@ public class ProfileDecorationService {
     @Transactional
     public void delete(Long id) {
         ProfileDecoration decoration = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.BADGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.BADGE_NOT_FOUND));
         decoration.deactivate();
     }
 

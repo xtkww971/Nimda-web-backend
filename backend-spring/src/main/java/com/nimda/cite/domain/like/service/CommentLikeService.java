@@ -1,7 +1,7 @@
 package com.nimda.cite.domain.like.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.NotFoundException;
 import com.nimda.cite.domain.alarm.service.AlarmService;
 import com.nimda.cite.domain.comment.entity.Comment;
 import com.nimda.cite.domain.comment.repository.CommentRepository;
@@ -29,9 +29,9 @@ public class CommentLikeService {
     @Transactional
     public String toggleCommentLike(Long userId, Long commentId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND));
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.COMMENT_NOT_FOUND));
 
         Optional<CommentLike> commentLike = commentLikeRepository.findByCommentAndUser(comment, user);
 
@@ -66,7 +66,7 @@ public class CommentLikeService {
     @Transactional(readOnly = true)
     public long getLikeCount(Long commentId) {
         Comment comment = commentRepository.findById(commentId).orElseThrow(
-                () -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.COMMENT_NOT_FOUND)
         );
         return commentLikeRepository.countByCommentId(commentId);
     }
@@ -74,10 +74,10 @@ public class CommentLikeService {
     @Transactional(readOnly = true)
     public boolean isUserLiked(Long userId, Long commentId) {
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(ErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
         Comment comment = commentRepository.findById(commentId).orElseThrow(
-                () -> new NotFoundException(ErrorCode.COMMENT_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.COMMENT_NOT_FOUND)
         );
 
         return commentLikeRepository.existsByCommentIdAndUserId(commentId, userId);

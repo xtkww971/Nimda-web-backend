@@ -1,11 +1,7 @@
 package com.nimda.cite.domain.attachment.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.ExternalServiceException;
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
 import com.nimda.cite.config.CheckConfig;
 import com.nimda.cite.domain.attachment.dto.AttachmentResponseDto;
 import com.nimda.cite.domain.attachment.entity.Attachment;
@@ -70,7 +66,7 @@ public class AttachmentService {
             CheckConfig.npeAndNegativeCheck(boardId, "boardId");
         }
         if (file.isEmpty()) {
-            throw new NotAllowFormException(ErrorCode.UPLOAD_FILE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.UPLOAD_FILE_NOT_FOUND);
         }
 
         // 0. userId 가져오기
@@ -83,7 +79,7 @@ public class AttachmentService {
 
         // 2. 허용된 확장자 검증 (화이트리스트, 확장자가 없으면 빈 문자열이므로 여기서 걸러짐)
         if(!isAllowedExtension(ext)){
-            throw new NotAllowFormException(ErrorCode.FILE_FORM_NOT_ALLOW);
+            throw new GlobalNimdaException(ErrorCode.FILE_FORM_NOT_ALLOW);
         }
 
         // 3. 이미지 파일이면 재인코딩하여 메타데이터/삽입 코드 파괴
@@ -104,7 +100,7 @@ public class AttachmentService {
                 );
                 return AttachmentResponseDto.from(attachmentRepository.save(attachment));
             } catch (IOException e) {
-                throw new ExternalServiceException(ErrorCode.IMAGE_PROCESSING_FAILED);
+                throw new GlobalNimdaException(ErrorCode.IMAGE_PROCESSING_FAILED);
             }
         }
 
@@ -167,7 +163,7 @@ public class AttachmentService {
      */
     public void deleteUserFiles(Long userId, List<Long> fileIds) {
         if (fileIds == null || fileIds.isEmpty()) {
-            throw new NotAllowFormException(ErrorCode.FILE_IDS_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.FILE_IDS_REQUIRED);
         }
 
         List<Attachment> files = attachmentRepository.findAllById(fileIds);
@@ -175,7 +171,7 @@ public class AttachmentService {
         for (Attachment file : files) {
             // 보안 검증: 요청 유저가 파일 소유자인지 확인
             if (!file.getUserId().equals(userId)) {
-                throw new NotIncludeRoleException(ErrorCode.FILE_ROLE_NOT_EXIST);
+                throw new GlobalNimdaException(ErrorCode.FILE_ROLE_NOT_EXIST);
             }
 
             deletePhysicalFile(file);
@@ -210,7 +206,7 @@ public class AttachmentService {
                                Long categoryId,
                                Long userId) {
         if (key == null || key.isBlank()) {
-            throw new NotAllowFormException(ErrorCode.S3_KEY_INNEED);
+            throw new GlobalNimdaException(ErrorCode.S3_KEY_INNEED);
         }
         // key에서 실제 저장 파일명 부분만 추출 (예: boards/files/uuid_name.png -> uuid_name.png)
         String storedFilename = extractStoredFilenameFromKey(key);
@@ -219,7 +215,7 @@ public class AttachmentService {
         String nameForExt = originFilename != null && !originFilename.isBlank() ? originFilename : storedFilename;
         String ext = extractExt(nameForExt);
         if (!isAllowedExtension(ext)) {
-            throw new NotAllowFormException(ErrorCode.FILE_FORM_NOT_ALLOW);
+            throw new GlobalNimdaException(ErrorCode.FILE_FORM_NOT_ALLOW);
         }
 
         String safeOrigin = (originFilename == null || originFilename.isBlank()) ? storedFilename : originFilename;
@@ -255,15 +251,15 @@ public class AttachmentService {
                 continue;
             }
             Attachment a = attachmentRepository.findById(aid)
-                    .orElseThrow(() -> new NotFoundException(ErrorCode.ATTACHMENT_NOT_FOUND));
+                    .orElseThrow(() -> new GlobalNimdaException(ErrorCode.ATTACHMENT_NOT_FOUND));
             if (!a.getUserId().equals(userId)) {
-                throw new NotIncludeRoleException(ErrorCode.ATTACHMENT_LINK_FORBIDDEN);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_LINK_FORBIDDEN);
             }
             if (a.getBoardId() != null && !a.getBoardId().equals(boardId)) {
-                throw new InvalidStateException(ErrorCode.ATTACHMENT_ALREADY_LINKED);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_ALREADY_LINKED);
             }
             if (categoryId != null && a.getCategoryId() != null && !a.getCategoryId().equals(categoryId)) {
-                throw new NotAllowFormException(ErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
             }
             a.linkToBoard(boardId);
         }
@@ -289,7 +285,7 @@ public class AttachmentService {
         for (Attachment a : current) {
             if (!wanted.contains(a.getId())) {
                 if (!a.getUserId().equals(userId)) {
-                    throw new NotIncludeRoleException(ErrorCode.ATTACHMENT_REMOVE_FORBIDDEN);
+                    throw new GlobalNimdaException(ErrorCode.ATTACHMENT_REMOVE_FORBIDDEN);
                 }
                 deletePhysicalFile(a);
                 attachmentRepository.delete(a);
@@ -298,15 +294,15 @@ public class AttachmentService {
 
         for (Long aid : wanted) {
             Attachment a = attachmentRepository.findById(aid)
-                    .orElseThrow(() -> new NotFoundException(ErrorCode.ATTACHMENT_NOT_FOUND));
+                    .orElseThrow(() -> new GlobalNimdaException(ErrorCode.ATTACHMENT_NOT_FOUND));
             if (!a.getUserId().equals(userId)) {
-                throw new NotIncludeRoleException(ErrorCode.ATTACHMENT_LINK_FORBIDDEN);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_LINK_FORBIDDEN);
             }
             if (a.getBoardId() != null && !a.getBoardId().equals(boardId)) {
-                throw new InvalidStateException(ErrorCode.ATTACHMENT_ALREADY_LINKED);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_ALREADY_LINKED);
             }
             if (categoryId != null && a.getCategoryId() != null && !a.getCategoryId().equals(categoryId)) {
-                throw new NotAllowFormException(ErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
+                throw new GlobalNimdaException(ErrorCode.ATTACHMENT_CATEGORY_MISMATCH);
             }
             if (a.getBoardId() == null) {
                 a.linkToBoard(boardId);
@@ -338,7 +334,7 @@ public class AttachmentService {
         List<Attachment> imageAttachments = attachmentIds.stream()
                 .filter(id -> id != null)
                 .map(id -> attachmentRepository.findById(id)
-                        .orElseThrow(() -> new NotFoundException(ErrorCode.ATTACHMENT_NOT_FOUND)))
+                        .orElseThrow(() -> new GlobalNimdaException(ErrorCode.ATTACHMENT_NOT_FOUND)))
                 .filter(this::isImage)
                 .sorted((left, right) -> left.getId().compareTo(right.getId()))
                 .toList();
@@ -354,7 +350,7 @@ public class AttachmentService {
         return imageAttachments.stream()
                 .filter(attachment -> attachment.getId().equals(requestedThumbnailAttachmentId))
                 .findFirst()
-                .orElseThrow(() -> new NotAllowFormException(ErrorCode.INVALID_THUMBNAIL))
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.INVALID_THUMBNAIL))
                 .getId();
     }
 
@@ -392,13 +388,13 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public String createPresignedDownloadUrl(AttachmentResponseDto attachment) {
         if (s3Service == null || attachment.getFilepath() == null) {
-            throw new NotFoundException(ErrorCode.FILE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.FILE_NOT_FOUND);
         }
 
         String disposition = "pdf".equalsIgnoreCase(attachment.getExtension()) ? "attachment" : null;
         String presignedUrl = s3Service.createPresignedGetUrl(attachment.getFilepath(), 10, disposition);
         if (presignedUrl == null) {
-            throw new NotFoundException(ErrorCode.FILE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.FILE_NOT_FOUND);
         }
         return presignedUrl;
     }
@@ -410,14 +406,14 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public S3Service.PresignedUpload createPresignedUpload(String type, String fileName) {
         if (!(fileStore instanceof S3FileStore s3FileStore)) {
-            throw new ExternalServiceException(ErrorCode.FILE_STORAGE_UNAVAILABLE);
+            throw new GlobalNimdaException(ErrorCode.FILE_STORAGE_UNAVAILABLE);
         }
         return s3FileStore.getPresignedUpload(type, fileName);
     }
 
     private Attachment findAttachment(Long attachmentId) {
         return attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.ATTACHMENT_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.ATTACHMENT_NOT_FOUND));
     }
 
     private void deletePhysicalFile(Attachment file) {

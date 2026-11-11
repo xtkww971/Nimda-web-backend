@@ -1,11 +1,7 @@
 package com.nimda.cite.domain.board.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
 import com.nimda.cite.common.exception.UnauthorizedException;
 import com.nimda.cite.domain.board.dto.CategoryCreateDTO;
 import com.nimda.cite.domain.board.dto.CategorySortOrderDTO;
@@ -66,12 +62,12 @@ public class CategoryService {
      * 
      * @param slug 카테고리 slug
      * @return Category (활성화된 카테고리)
-     * @throws NotFoundException 카테고리를 찾을 수 없는 경우
+     * @throws GlobalNimdaException 카테고리를 찾을 수 없는 경우
      */
     @Transactional(readOnly = true)
     public Category getCategoryBySlug(String slug) {
         return categoryRepository.findBySlugAndIsActiveTrue(slug)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
     }
 
     /**
@@ -90,7 +86,7 @@ public class CategoryService {
                 .anyMatch(authority -> authority.getAuthorityName().equals("ROLE_ADMIN"));
 
         if (!isAdmin) {
-            throw new NotIncludeRoleException(ErrorCode.ADMIN_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.ADMIN_REQUIRED);
         }
     }
 
@@ -148,7 +144,7 @@ public class CategoryService {
 
         // #1. 업데이트할 카테고리 탐색
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. Slug 중복 체크
         if (updateDTO.getSlug() != null && !updateDTO.getSlug().equals(category.getSlug())) {
@@ -162,7 +158,7 @@ public class CategoryService {
 
             // 자기 자신을 부모로 설정하는 것 방지
             if (newParentId.equals(id)) {
-                throw new NotAllowFormException(ErrorCode.SELF_PARENT_NOT_ALLOWED);
+                throw new GlobalNimdaException(ErrorCode.SELF_PARENT_NOT_ALLOWED);
             }
 
             // 부모 존재 및 활성화 확인
@@ -170,7 +166,7 @@ public class CategoryService {
 
             // 순환 참조 방지 체크
             if (hasCircularReference(id, newParentId)) {
-                throw new NotAllowFormException(ErrorCode.CIRCULAR_REFERENCE);
+                throw new GlobalNimdaException(ErrorCode.CIRCULAR_REFERENCE);
             }
 
             category.setParentId(newParentId);
@@ -215,17 +211,17 @@ public class CategoryService {
 
         // 1. 카테고리 존재 확인
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // 2. 자식 카테고리 존재 확인
         List<Category> children = categoryRepository.findByParentIdAndIsActiveTrueOrderBySortOrderAsc(id);
         if (!children.isEmpty()) {
-            throw new InvalidStateException(ErrorCode.HAS_CHILD_CATEGORY);
+            throw new GlobalNimdaException(ErrorCode.HAS_CHILD_CATEGORY);
         }
 
         // 3. 게시글 존재 확인 (간단 체크: postCount 필드 활용)
         if (category.getPostCount() != null && category.getPostCount() > 0) {
-            throw new InvalidStateException(ErrorCode.HAS_POSTS,
+            throw new GlobalNimdaException(ErrorCode.HAS_POSTS,
                     ErrorCode.HAS_POSTS.getMessage() + " (" + category.getPostCount() + "개)");
         }
 
@@ -255,7 +251,7 @@ public class CategoryService {
     @Transactional
     public Category setShopEnabled(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
 
         category.setShopEnabled(true);
         return category;
@@ -266,7 +262,7 @@ public class CategoryService {
      * 
      * @param slug      확인할 slug
      * @param excludeId 제외할 카테고리 ID (수정 시 자기 자신 제외용)
-     * @throws AlreadyExistException 중복된 경우
+     * @throws GlobalNimdaException 중복된 경우
      */
     private void validateSlugUnique(String slug, Long excludeId) {
 
@@ -285,7 +281,7 @@ public class CategoryService {
                     return;
                 }
             }
-            throw new AlreadyExistException(ErrorCode.SLUG_ALREADY_EXIST);
+            throw new GlobalNimdaException(ErrorCode.SLUG_ALREADY_EXIST);
         }
     }
 
@@ -293,19 +289,19 @@ public class CategoryService {
      * 부모 카테고리 검증
      * - 부모 카테고리가 유효한지 (isActive) 체크한다.
      * parentId : 부모 아이디
-     * NotFoundException - 부모 카테고리를 찾을 수 없는 경우
+     * GlobalNimdaException - 부모 카테고리를 찾을 수 없는 경우
      */
     private void validateParent(Long parentId) {
 
         Category parent = categoryRepository.findById(parentId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.PARENT_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.PARENT_NOT_FOUND));
 
         if (!parent.getIsActive()) {
-            throw new NotAllowFormException(ErrorCode.INACTIVE_PARENT);
+            throw new GlobalNimdaException(ErrorCode.INACTIVE_PARENT);
         }
 
         if (parent.getParentId() != null) {
-            throw new NotAllowFormException(ErrorCode.MAX_DEPTH_EXCEEDED);
+            throw new GlobalNimdaException(ErrorCode.MAX_DEPTH_EXCEEDED);
         }
     }
 

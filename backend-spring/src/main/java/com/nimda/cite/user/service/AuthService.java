@@ -1,10 +1,7 @@
 package com.nimda.cite.user.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
 import com.nimda.cite.common.exception.UnauthorizedException;
 import com.nimda.cite.config.CheckConfig;
 import com.nimda.cite.user.dto.register.RegisterRequestDTO;
@@ -14,7 +11,6 @@ import redis.util.RedisUtil;
 import com.nimda.cite.user.dto.LoginResponseDTO;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
-import com.nimda.cite.common.exception.UserNotApprovedException;
 import com.nimda.cite.domain.profiledecoration.entity.ProfileDecoration;
 import com.nimda.cite.domain.profiledecoration.repository.ProfileDecorationRepository;
 import com.nimda.cite.domain.profiledecoration.ownership.ProfileDecorationOwnershipService;
@@ -51,7 +47,7 @@ public class AuthService {
      * @param password 비밀번호
      * @return 인증된 사용자
      * @throws UnauthorizedException    아이디가 없거나 비밀번호가 틀린 경우 (계정 존재 여부를 노출하지 않도록 동일한 에러 사용)
-     * @throws UserNotApprovedException 승인되지 않은 사용자인 경우
+     * @throws GlobalNimdaException 승인되지 않은 사용자인 경우
      */
     public User validateUser(String userId, String password) {
         CheckConfig.npeAndBlankCheck(userId, "userId");
@@ -69,11 +65,11 @@ public class AuthService {
         // Note. 유저의 현재 상태에 따른 커스텀 예회를 반환한다.
         if (user.getStatus() != ApprovalStatus.APPROVED) {
             if (user.getStatus() == ApprovalStatus.PENDING) {
-                throw new UserNotApprovedException(ErrorCode.STATUS_PENDING);
+                throw new GlobalNimdaException(ErrorCode.STATUS_PENDING);
             } else if (user.getStatus() == ApprovalStatus.REJECTED) {
-                throw new UserNotApprovedException(ErrorCode.STATUS_REJECTED);
+                throw new GlobalNimdaException(ErrorCode.STATUS_REJECTED);
             } else {
-                throw new UserNotApprovedException(ErrorCode.STATUS_NOT_APPROVED);
+                throw new GlobalNimdaException(ErrorCode.STATUS_NOT_APPROVED);
             }
         }
 
@@ -87,7 +83,7 @@ public class AuthService {
     public LoginResponseDTO login(User user) {
         // 권한 정보를 포함한 전체 User 객체 조회 (@EntityGraph로 권한 정보 함께 로드)
         User fullUser = userRepository.findById(user.getId())
-                .orElseThrow(() -> new NotFoundException(ErrorCode.AUTH_USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.AUTH_USER_NOT_FOUND));
 
         CustomUserDetails userDetails = new CustomUserDetails(fullUser);
         Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -149,7 +145,7 @@ public class AuthService {
     @Transactional
     public User updateProfileImage(Long userId, String profileImageKey) {
         if (profileImageKey == null || profileImageKey.isBlank()) {
-            throw new NotAllowFormException(ErrorCode.PROFILE_IMAGE_KEY_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.PROFILE_IMAGE_KEY_REQUIRED);
         }
 
         User user = findUser(userId);
@@ -170,13 +166,13 @@ public class AuthService {
 
         String decorationKey = profileDecorationKey.trim();
         ProfileDecoration decoration = profileDecorationRepository.findByKey(decorationKey)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.DECORATION_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.DECORATION_NOT_FOUND));
         if (!decoration.isActive()) {
-            throw new NotAllowFormException(ErrorCode.DECORATION_NOT_USABLE);
+            throw new GlobalNimdaException(ErrorCode.DECORATION_NOT_USABLE);
         }
 
         if (!profileDecorationOwnershipService.owns(userId, decoration.getId())) {
-            throw new NotIncludeRoleException(ErrorCode.DECORATION_NOT_OWNED);
+            throw new GlobalNimdaException(ErrorCode.DECORATION_NOT_OWNED);
         }
 
         user.changeProfileDecoration(decorationKey);
@@ -194,7 +190,7 @@ public class AuthService {
         // 닉네임 변경 시 중복 체크
         if (nickname != null && !nickname.isBlank() && !nickname.equals(user.getNickname())
                 && userRepository.existsByNickname(nickname)) {
-            throw new AlreadyExistException(ErrorCode.NICKNAME_ALREADY_EXIST);
+            throw new GlobalNimdaException(ErrorCode.NICKNAME_ALREADY_EXIST);
         }
 
         // Dirty Checking에 의해 자동 UPDATE
@@ -205,7 +201,7 @@ public class AuthService {
     @Transactional
     public void changePassword(String userId, String password) {
         User user = userRepository.findByUserId(userId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.AUTH_USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.AUTH_USER_NOT_FOUND));
 
         String encodedPassword = passwordEncoder.encode(password);
         user.changePassword(encodedPassword);
@@ -213,6 +209,6 @@ public class AuthService {
 
     private User findUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.AUTH_USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.AUTH_USER_NOT_FOUND));
     }
 }
