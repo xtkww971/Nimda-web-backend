@@ -3,7 +3,6 @@ app:
   
 spring:
   profiles:
-    active: local
   data:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}
