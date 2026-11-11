@@ -1,0 +1,5 @@
+# 서버(리눅스)에서 그대로 실행·해석되는 배포 매니페스트는 항상 LF로 둔다.
+*.sh text eol=lf
+docker-compose*.yml text eol=lf
+.env.example text eol=lf
+nginx/** text eol=lf
