@@ -6,6 +6,7 @@ import judgeServer.domain.challenge.dto.ChallengeDetailResponse;
 import judgeServer.domain.challenge.dto.ChallengeSummaryResponse;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 참가자가 문제를 보는 조회 API (읽기 전용).
@@ -37,6 +40,7 @@ import java.util.List;
 public class ChallengeQueryController {
 
     private final ChallengeRepository challengeRepository;
+    private final SolveRepository solveRepository;
 
     /** 문제 목록. 관리자와 DEV는 초안까지 함께 본다. */
     @GetMapping
@@ -45,7 +49,13 @@ public class ChallengeQueryController {
                 ? challengeRepository.findAllByOrderByIdAsc()
                 : challengeRepository.findByIsPublicTrueOrderByIdAsc();
 
-        return ApiResponse.ok(challenges.stream().map(ChallengeSummaryResponse::from).toList())
+        Map<Long, Long> solveCounts = solveRepository.countGroupByChallengeId().stream()
+                .collect(Collectors.toMap(SolveRepository.SolveCount::getChallengeId,
+                        SolveRepository.SolveCount::getSolves));
+
+        return ApiResponse.ok(challenges.stream()
+                        .map(c -> ChallengeSummaryResponse.from(c, solveCounts.getOrDefault(c.getId(), 0L)))
+                        .toList())
                 .toResponse();
     }
 
@@ -59,7 +69,8 @@ public class ChallengeQueryController {
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canViewDrafts(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
-        return ApiResponse.ok(ChallengeDetailResponse.from(challenge)).toResponse();
+        return ApiResponse.ok(ChallengeDetailResponse.from(challenge,
+                solveRepository.countByChallengeId(challenge.getId()))).toResponse();
     }
 
     private boolean canViewDrafts(CustomUserDetails user) {
