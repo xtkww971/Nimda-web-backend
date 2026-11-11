@@ -86,6 +86,9 @@ services:
       - AWS_S3_SECRET_KEY=${AWS_S3_SECRET_KEY}
       # JWT 토큰 설정
       - JWT_SECRET=${JWT_SECRET}
+      # Spring Security 기본 계정. application.yml에 기본값이 없어 빠지면 기동이 실패한다.
+      - SPRING_SECURITY_USER_NAME=${SPRING_SECURITY_USER_NAME}
+      - SPRING_SECURITY_USER_PASSWORD=${SPRING_SECURITY_USER_PASSWORD}
       # 이메일 설정
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
@@ -136,6 +139,9 @@ services:
       - AWS_S3_SECRET_KEY=${AWS_S3_SECRET_KEY}
       # JWT 토큰 설정
       - JWT_SECRET=${JWT_SECRET}
+      # Spring Security 기본 계정. application.yml에 기본값이 없어 빠지면 기동이 실패한다.
+      - SPRING_SECURITY_USER_NAME=${SPRING_SECURITY_USER_NAME}
+      - SPRING_SECURITY_USER_PASSWORD=${SPRING_SECURITY_USER_PASSWORD}
       # 이메일 설정
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
