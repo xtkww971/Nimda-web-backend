@@ -97,6 +97,13 @@ echo "server backend-$TARGET_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
 
 # nginx도 compose 정의에 맞춘다(네트워크가 바뀌었으면 재생성되어 새 .inc를 읽는다). 그대로면 아무것도 안 한다.
 reconcile nginx nimda-nginx
+# CI가 보낸 nginx.conf를 검사한다. 실패하면(예: 인증서 파일 없음) reload하지 않아 기존 설정이 그대로 돈다.
+if ! docker exec nimda-nginx nginx -t; then
+    echo "❌ nginx 설정 검사 실패 — reload하지 않습니다. 트래픽은 $ACTIVE_COLOR 에 그대로 둡니다."
+    echo "server backend-$ACTIVE_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
+    docker compose stop backend-$TARGET_COLOR
+    exit 1
+fi
 # Nginx 프록시 서버 변경
 docker exec nimda-nginx nginx -s reload
 echo "🔄 Nginx 트래픽을 backend-$TARGET_COLOR 로 전환했습니다."

@@ -44,14 +44,16 @@ jobs:
             xtkww971/nimda-backend:${{ steps.vars.outputs.sha_short }}
 
       # 서버 compose는 레포 파일로만 정한다. 서버에서 손으로 고치면 다음 배포에 덮어써진다.
-      # nginx/nginx.conf는 와일드카드 인증서(RB-0001 단계 5)가 준비된 뒤에 여기에 추가한다.
+      # nginx.conf의 인스턴스 블록은 와일드카드 인증서(live/nimda.kr, RB-0001 단계 5)를 참조한다.
+      # 서버에 인증서가 있어야 한다. 없으면 deploy.sh의 nginx -t가 막고 기존 설정을 유지한다.
+      # nginx/conf.d(active-backend.inc)는 서버가 관리하는 상태라 보내지 않는다.
       - name: 배포 매니페스트 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy.sh,docker-compose.yml"
+          source: "deploy.sh,docker-compose.yml,nginx/nginx.conf,scripts/certbot-dns-hook.sh"
           target: "/home/ubuntu/app"
 
 
