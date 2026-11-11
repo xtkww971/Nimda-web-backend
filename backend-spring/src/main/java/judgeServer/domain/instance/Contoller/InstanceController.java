@@ -4,6 +4,7 @@ import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import judgeServer.domain.challenge.entity.Challenge;
+import judgeServer.domain.instance.Service.CtfServerStatus;
 import judgeServer.domain.instance.Service.InstanceService;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class InstanceController {
 
     private final ChallengeRepository challengeRepository;
     private final InstanceService instanceService;
+    private final CtfServerStatus serverStatus;
 
     // 컨테이너 생성 요청
     @PostMapping("/{code}")
@@ -49,6 +51,12 @@ public class InstanceController {
         // WEB·PWN만 인스턴스를 띄운다. Judge의 분류(instanceCategories)와 같은 기준이다.
         if (!challenge.getCategory().usesInstance()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 문제는 인스턴스 기능을 지원하지 않습니다.");
+        }
+
+        // 버튼을 숨기는 것만으로는 API 직접 호출을 못 막는다. 꺼진 서버로 보낸 요청은 아무도 안 읽어서
+        // PENDING에 멈추므로, 넣기 전에 거절한다 (CTF 레포 ADR-0022).
+        if (!serverStatus.isAvailable()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "CTF 서버가 아직 작동중이지 않습니다.");
         }
 
         String uuid = instanceService.createInstance(challenge, userId);
