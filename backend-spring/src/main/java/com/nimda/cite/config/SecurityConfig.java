@@ -159,9 +159,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/cite/category/**").hasRole("ADMIN")
 
                         // CTF 문제 api (등록/삭제/공개전환은 관리자와 DEV만)
-                        // 첨부파일 다운로드는 참가자가 쓰는 기능이라 아래 규칙보다 먼저 둔다
+                        // 첨부파일 다운로드와 플래그 제출은 참가자가 쓰는 기능이라 아래 규칙보다 먼저 둔다
                         // (규칙은 먼저 걸리는 것이 이긴다).
                         .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*/download").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
                         .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
 
