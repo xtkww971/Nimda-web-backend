@@ -110,6 +110,9 @@ ctf:
     consumer-group: ${CTF_QUEUE_CONSUMER_GROUP:ctf-provisioners}
     result-stream-key: ${CTF_QUEUE_RESULT_STREAM_KEY:ctf:request:results}
     result-consumer-group: ${CTF_QUEUE_RESULT_CONSUMER_GROUP:ctf-result-consumers}
+    # 플래그 제출 큐. 백엔드 안에서 발행하고 소비한다.
+    flag-stream-key: ${CTF_QUEUE_FLAG_STREAM_KEY:ctf:flag:submissions}
+    flag-consumer-group: ${CTF_QUEUE_FLAG_CONSUMER_GROUP:ctf-flag-judges}
   # todo 인스턴스 서브도메인 접근 로직 단순화
   instance:
     base-domain: ${CTF_INSTANCE_BASE_DOMAIN:}

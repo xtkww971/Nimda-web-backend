@@ -17,4 +17,8 @@ public class CtfQueueProperties {
     // 조율자가 결과(host/port 또는 downloadUrl)를 돌려주는 스트림.
     private String resultStreamKey = "ctf:request:results";
     private String resultConsumerGroup = "ctf-result-consumers";
+
+    // 플래그 제출을 채점기로 넘기는 스트림. 백엔드 안에서 발행하고 소비한다.
+    private String flagStreamKey = "ctf:flag:submissions";
+    private String flagConsumerGroup = "ctf-flag-judges";
 }
