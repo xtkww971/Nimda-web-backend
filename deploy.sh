@@ -23,9 +23,26 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     exit 1
 fi
 
-# 1. 공용 인프라(mysql, redis)를 compose 정의에 맞춘다. 정의가 그대로면 아무것도 안 한다.
-#    --no-deps: nginx나 다른 색상 backend를 같이 띄우지 않는다.
-if ! docker compose up -d --no-deps --wait mysql redis; then
+# compose는 서비스 정의가 바뀔 때만 재생성하고, 망 정의(name:)만 바뀐 건 감지하지 못한다.
+# 그래서 컨테이너가 compose가 정한 망에 붙어 있는지 직접 보고, 아니면 강제로 재생성한다.
+APP_NETWORK=nimda-network
+
+# 서비스를 compose 정의에 맞춘다. 정의가 그대로이고 망도 맞으면 아무것도 안 한다.
+#   --no-deps: nginx나 다른 색상 backend를 같이 띄우지 않는다.
+reconcile() {
+    local service=$1 container=$2
+    shift 2
+    local recreate=()
+    if ! docker inspect "$container" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null \
+            | grep -qw "$APP_NETWORK"; then
+        echo "🔁 $container 가 $APP_NETWORK 에 없어 재생성합니다."
+        recreate=(--force-recreate)
+    fi
+    docker compose up -d --no-deps "${recreate[@]}" "$@" "$service"
+}
+
+# 1. 공용 인프라(mysql, redis)
+if ! reconcile mysql nimda-mysql --wait || ! reconcile redis nimda-redis --wait; then
     echo "❌ mysql/redis가 healthy가 되지 않았습니다. 배포를 중단합니다."
     exit 1
 fi
@@ -79,7 +96,7 @@ fi
 echo "server backend-$TARGET_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
 
 # nginx도 compose 정의에 맞춘다(네트워크가 바뀌었으면 재생성되어 새 .inc를 읽는다). 그대로면 아무것도 안 한다.
-docker compose up -d --no-deps nginx
+reconcile nginx nimda-nginx
 # Nginx 프록시 서버 변경
 docker exec nimda-nginx nginx -s reload
 echo "🔄 Nginx 트래픽을 backend-$TARGET_COLOR 로 전환했습니다."
