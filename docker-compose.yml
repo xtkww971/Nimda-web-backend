@@ -180,6 +180,10 @@ networks:
     # (기본값은 프로젝트명이 붙어 {프로젝트}_nimda-network가 된다)
     name: nimda-network
     driver: bridge
-  # Judge Server가 --internal로 미리 만든다. 없으면 backend가 뜨지 않는다.
+  # CTF 인스턴스 망. backend가 만들고 Judge Server는 이름으로 붙기만 한다.
+  # backend는 Judge Server 없이도 떠야 하므로 external로 두지 않는다.
+  # internal이라 이 망에 붙은 인스턴스 컨테이너는 밖으로 나가지 못한다.
   ctf-instances:
-    external: true
+    name: ctf-instances
+    driver: bridge
+    internal: true
