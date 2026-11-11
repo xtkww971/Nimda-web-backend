@@ -1,5 +1,7 @@
 package judgeServer.domain.instance.Proxy;
 
+import judgeServer.config.InstanceProperties;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,16 @@ import java.util.Set;
 // ctf 서버로 보내는 요청을 전달하는 Proxy
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class InstanceProxy {
+
+    /**
+     * 게이트웨이에 "어느 인스턴스로 넘길지"를 알리는 헤더. 값은 결과의 host:port(alias:EXPOSE 포트).
+     * 참가자가 보낸 같은 이름의 헤더는 항상 지운다. 남기면 남의 인스턴스나 아무 내부 주소로 보낼 수 있다.
+     */
+    public static final String TARGET_HEADER = "X-Ctf-Target";
+
+    private final InstanceProperties props;
 
     // 참가자에게 보이는 502 문구. 예외 메시지에는 내부 호스트명·IP가 담길 수 있어 본문에 넣지 않는다.
     private static final byte[] BAD_GATEWAY_BODY = "인스턴스에 연결할 수 없습니다.".getBytes(StandardCharsets.UTF_8);
@@ -42,25 +53,32 @@ public class InstanceProxy {
         
         // 쿼리가 있는지 없는지 확인
         String q = (query != null && !query.isEmpty()) ? "?" + query : "";
-        // host, port, path + q로 url을 조합한다.
+        // 게이트웨이가 있으면 게이트웨이로, 없으면 결과의 host:port로 직접 보낸다.
+        String gateway = props.getGateway() == null ? "" : props.getGateway().trim();
+        String target = host + ":" + port;
+        String authority = gateway.isEmpty() ? target : gateway;
         URI uri;
         try {
-            uri = URI.create("http://" + host + ":" + port + "/" + path + q);
+            uri = URI.create("http://" + authority + "/" + path + q);
         } catch (IllegalArgumentException e) {
             // host에 URI에 못 쓰는 문자가 있거나 경로가 깨진 경우. IOException이 아니라 그냥 두면 500이 된다.
-            log.warn("인스턴스 주소를 만들 수 없습니다: host={}, port={}, reason={}", host, port, e.getMessage());
+            log.warn("인스턴스 주소를 만들 수 없습니다: authority={}, reason={}", authority, e.getMessage());
             return ResponseEntity.status(502).body(BAD_GATEWAY_BODY);
         }
         // 해당 도메인으로 요청을 보내고 대기한다. 타임아웃 15초
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(15));
 
-        //
         if (inHeaders != null) {
             inHeaders.forEach((name, values) -> {
-                if (!HOP_BY_HOP.contains(name.toLowerCase(Locale.ROOT))) {
+                String lower = name.toLowerCase(Locale.ROOT);
+                // 참가자가 보낸 대상 헤더는 버린다(위조 방지). 게이트웨이 모드에서는 아래에서 backend가 직접 넣는다.
+                if (!HOP_BY_HOP.contains(lower) && !TARGET_HEADER.equalsIgnoreCase(lower)) {
                     values.forEach(v -> builder.header(name, v));
                 }
             });
+        }
+        if (!gateway.isEmpty()) {
+            builder.header(TARGET_HEADER, target);
         }
 
         // 요청에 전달할 값이 있는지 확인
@@ -86,7 +104,7 @@ public class InstanceProxy {
             }
             return new ResponseEntity<>(resp.body(), outHeaders, resp.statusCode());
         } catch (IOException e) {
-            log.warn("인스턴스 연결 실패: host={}, port={}, reason={}", host, port, e.toString());
+            log.warn("인스턴스 연결 실패: target={}, via={}, reason={}", target, authority, e.toString());
             return ResponseEntity.status(502).body(BAD_GATEWAY_BODY);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -96,6 +96,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       # CTF 인스턴스 서브도메인 프록시 (inst-{uuid}.{도메인}). 비어 있으면 꺼진다.
       - CTF_INSTANCE_BASE_DOMAIN=${CTF_INSTANCE_BASE_DOMAIN:-}
+      # CTF 서버(EC2) 인스턴스 게이트웨이 "사설IP:포트" (VPC peering). 비어 있으면 결과 host:port로 직접 붙는다.
+      - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
@@ -149,6 +151,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       # CTF 인스턴스 서브도메인 프록시 (inst-{uuid}.{도메인}). 비어 있으면 꺼진다.
       - CTF_INSTANCE_BASE_DOMAIN=${CTF_INSTANCE_BASE_DOMAIN:-}
+      # CTF 서버(EC2) 인스턴스 게이트웨이 "사설IP:포트" (VPC peering). 비어 있으면 결과 host:port로 직접 붙는다.
+      - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
