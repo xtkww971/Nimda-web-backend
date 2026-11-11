@@ -32,12 +32,20 @@ public class Challenge {
     @Column(nullable = false, length = 20)
     private ChallengeCategory category;
 
-    /* TODO 
-        아직 점수 계산 방식이 결정되지 않았기에 100으로 고정
-    */
+    /** 첫 번째 해결자가 받는 점수 */
     @Builder.Default
-    @Column(nullable = false)
-    private Integer points = 100;
+    @Column(name = "max_point", nullable = false)
+    private Integer maxPoint = 100;
+
+    /** 해결자가 늘어도 이 아래로는 내려가지 않는다 */
+    @Builder.Default
+    @Column(name = "min_point", nullable = false)
+    private Integer minPoint = 0;
+
+    /** 해결자 한 명당 깎이는 점수 */
+    @Builder.Default
+    @Column(name = "decrease_point", nullable = false)
+    private Integer decreasePoint = 0;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -72,6 +80,12 @@ public class Challenge {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /** 이미 {@code solveCount}명이 푼 상태에서 다음 해결자가 받을 점수. */
+    public int currentPoints(long solveCount) {
+        long decreased = maxPoint - decreasePoint * solveCount;
+        return (int) Math.max(minPoint, decreased);
+    }
 
     @PrePersist
     public void prePersist() {
