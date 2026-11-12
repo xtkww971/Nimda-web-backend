@@ -7,12 +7,15 @@ import judgeServer.domain.challenge.enums.FlagType;
 import judgeServer.domain.challenge.enums.IsolationType;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.challenge.util.FlagHasher;
+import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
 import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class ChallengeService {
 
     private final ChallengeRepository challengeRepository;
     private final SolveRepository solveRepository;
+    private final CtfTeamScoreRepository teamScoreRepository;
     private final S3FileStore fileStore;
 
     /**
@@ -95,13 +99,23 @@ public class ChallengeService {
         }
     }
 
+    /**
+     * 문제와 그 정답 기록을 지우고, 이 문제를 푼 팀들의 점수를 다시 계산한다.
+     *
+     * <p>{@link judgeServer.domain.solve.service.SolveRecorder}와 같은 문제 행을 잠가서, 삭제 도중 같은 문제의
+     * 정답이 기록돼 점수판에만 점수가 남는 일을 막는다. 잠금 조회가 트랜잭션의 첫 조회여야 한다.
+     */
     @Transactional
     public void deleteChallenge(Long id) {
-        Challenge challenge = challengeRepository.findById(id)
+        Challenge challenge = challengeRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "삭제하려는 문제가 존재하지 않습니다."));
 
+        List<Long> solverTeamIds = solveRepository.findTeamIdsByChallengeId(id);
         solveRepository.deleteByChallengeId(id);
+        if (!solverTeamIds.isEmpty()) {
+            teamScoreRepository.recalculate(solverTeamIds);
+        }
         challengeRepository.delete(challenge);
         fileStore.deleteChallengeDirectory(challenge.getCode());
     }

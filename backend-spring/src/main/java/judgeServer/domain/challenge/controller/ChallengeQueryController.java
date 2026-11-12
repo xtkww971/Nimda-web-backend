@@ -6,6 +6,7 @@ import judgeServer.domain.challenge.dto.ChallengeDetailResponse;
 import judgeServer.domain.challenge.dto.ChallengeSummaryResponse;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,6 +34,8 @@ import java.util.stream.Collectors;
  *
  * <p>비공개(초안) 문제는 출제 권한이 있는 관리자와 DEV에게만 보인다. 코드만 알면 열람되는 일이
  * 없도록, 없는 문제와 같은 404로 답한다.
+ *
+ * <p>팀전이라 팀에 소속되지 않은 참가자에게는 목록·상세 모두 403으로 답한다 (관리자·DEV 제외).
  */
 @RestController
 @RequestMapping("/api/ctf/challenges")
@@ -41,10 +44,12 @@ public class ChallengeQueryController {
 
     private final ChallengeRepository challengeRepository;
     private final SolveRepository solveRepository;
+    private final CtfTeamResolver teamResolver;
 
     /** 문제 목록. 관리자와 DEV는 초안까지 함께 본다. */
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal CustomUserDetails user) {
+        teamResolver.requireTeamOrStaff(user);
         List<Challenge> challenges = canViewDrafts(user)
                 ? challengeRepository.findAllByOrderByIdAsc()
                 : challengeRepository.findByIsPublicTrueOrderByIdAsc();
@@ -63,6 +68,7 @@ public class ChallengeQueryController {
     @GetMapping("/{code}")
     public ResponseEntity<?> detail(@PathVariable String code,
                                     @AuthenticationPrincipal CustomUserDetails user) {
+        teamResolver.requireTeamOrStaff(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 
