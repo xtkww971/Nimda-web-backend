@@ -32,4 +32,5 @@ public class MyPageResponseDTO {
 
     private String profileImage;
     private String profileDecoration;
+    private List<String> roles;
 }

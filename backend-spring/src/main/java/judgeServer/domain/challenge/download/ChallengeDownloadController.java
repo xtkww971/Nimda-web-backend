@@ -2,10 +2,11 @@ package judgeServer.domain.challenge.download;
 
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.user.security.CustomUserDetails;
+import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.challenge.entity.Challenge;
-import judgeServer.domain.challenge.mq.message.CtfResultMessage;
-import judgeServer.domain.challenge.mq.message.RequestStatus;
-import judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer;
+import redis.mq.message.CtfResultMessage;
+import redis.mq.message.RequestStatus;
+import redis.mq.producer.RedisCtfRequestProducer;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.challenge.service.ChallengeRules;
 import lombok.RequiredArgsConstructor;
@@ -34,16 +35,19 @@ public class ChallengeDownloadController {
     private final RedisCtfRequestProducer producer;
     private final ChallengeDownloadStore resultStore;
     private final ChallengeDownloadUrlCache urlCache;
+    private final CtfTeamResolver teamResolver;
 
     // 문제 코드로 다운로드 링크 요청
     @PostMapping("/{code}/download")
     public ResponseEntity<?> request(@PathVariable String code,
                                      @AuthenticationPrincipal CustomUserDetails user) {
+        // 팀전이라 팀이 없는 참가자는 문제 파일을 받을 수 없다 (관리자·DEV 제외).
+        teamResolver.requireTeamOrStaff(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 
-        // 비공개 문제(초안)는 관리자만. 코드만 알면 받아갈 수 있으면 안 된다.
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !isAdmin(user)) {
+        // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 받아갈 수 있으면 안 된다.
+        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
         // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
@@ -145,12 +149,12 @@ public class ChallengeDownloadController {
         return user.getUser().getId();
     }
 
-    private boolean isAdmin(CustomUserDetails user) {
+    private boolean canAccessDrafts(CustomUserDetails user) {
         if (user == null) {
             return false;
         }
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
     }
 }

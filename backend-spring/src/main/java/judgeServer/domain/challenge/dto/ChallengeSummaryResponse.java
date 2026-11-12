@@ -9,19 +9,26 @@ public record ChallengeSummaryResponse(
         String code,
         String title,
         ChallengeCategory category,
+        /** 지금 풀면 받는 점수. 해결자가 늘면 줄어든다. */
         Integer points,
+        Integer maxPoint,
+        Integer minPoint,
+        Integer decreasePoint,
         IsolationType isolationType,
         /** 첨부파일(문제 파일)이 붙어 있는지. 실제 S3 키는 내보내지 않는다. */
         boolean hasAttachment,
         Boolean isPublic
 ) {
-    public static ChallengeSummaryResponse from(Challenge challenge) {
+    public static ChallengeSummaryResponse from(Challenge challenge, long solveCount) {
         return new ChallengeSummaryResponse(
                 challenge.getId(),
                 challenge.getCode(),
                 challenge.getTitle(),
                 challenge.getCategory(),
-                challenge.getPoints(),
+                challenge.currentPoints(solveCount),
+                challenge.getMaxPoint(),
+                challenge.getMinPoint(),
+                challenge.getDecreasePoint(),
                 challenge.getIsolationType(),
                 challenge.getAttachmentKey() != null && !challenge.getAttachmentKey().isBlank(),
                 challenge.getIsPublic()

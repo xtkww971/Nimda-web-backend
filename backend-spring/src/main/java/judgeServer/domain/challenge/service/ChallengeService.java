@@ -7,17 +7,27 @@ import judgeServer.domain.challenge.enums.FlagType;
 import judgeServer.domain.challenge.enums.IsolationType;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.challenge.util.FlagHasher;
+import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
+import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ChallengeService {
 
+    private static final int DEFAULT_MAX_POINT = 100;
+    private static final int DEFAULT_MIN_POINT = 0;
+    private static final int DEFAULT_DECREASE_POINT = 10;
+
     private final ChallengeRepository challengeRepository;
+    private final SolveRepository solveRepository;
+    private final CtfTeamScoreRepository teamScoreRepository;
     private final S3FileStore fileStore;
 
     /**
@@ -39,6 +49,14 @@ public class ChallengeService {
         // Judge가 받지 않는 조합은 저장하지 않는다. 저장되면 풀 수 없는 문제가 된다.
         ChallengeRules.validate(request.getCategory(), isolationType, flagType);
 
+        int maxPoint = request.getMaxPoint() != null ? request.getMaxPoint() : DEFAULT_MAX_POINT;
+        int minPoint = request.getMinPoint() != null ? request.getMinPoint() : DEFAULT_MIN_POINT;
+        int decreasePoint = request.getDecreasePoint() != null ? request.getDecreasePoint() : DEFAULT_DECREASE_POINT;
+        if (minPoint > maxPoint) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "최소 점수는 최대 점수보다 클 수 없습니다.");
+        }
+
         // DYNAMIC은 사용자마다 플래그가 달라 미리 저장할 값이 없다.
         String flagHash = null;
         if (flagType == FlagType.STATIC) {
@@ -54,7 +72,9 @@ public class ChallengeService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .category(request.getCategory())
-                .points(request.getPoints() != null ? request.getPoints() : 100)
+                .maxPoint(maxPoint)
+                .minPoint(minPoint)
+                .decreasePoint(decreasePoint)
                 .flagType(flagType)
                 .flagHash(flagHash)
                 .isolationType(isolationType)
@@ -79,12 +99,23 @@ public class ChallengeService {
         }
     }
 
+    /**
+     * 문제와 그 정답 기록을 지우고, 이 문제를 푼 팀들의 점수를 다시 계산한다.
+     *
+     * <p>{@link judgeServer.domain.solve.service.SolveRecorder}와 같은 문제 행을 잠가서, 삭제 도중 같은 문제의
+     * 정답이 기록돼 점수판에만 점수가 남는 일을 막는다. 잠금 조회가 트랜잭션의 첫 조회여야 한다.
+     */
     @Transactional
     public void deleteChallenge(Long id) {
-        Challenge challenge = challengeRepository.findById(id)
+        Challenge challenge = challengeRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "삭제하려는 문제가 존재하지 않습니다."));
 
+        List<Long> solverTeamIds = solveRepository.findTeamIdsByChallengeId(id);
+        solveRepository.deleteByChallengeId(id);
+        if (!solverTeamIds.isEmpty()) {
+            teamScoreRepository.recalculate(solverTeamIds);
+        }
         challengeRepository.delete(challenge);
         fileStore.deleteChallengeDirectory(challenge.getCode());
     }

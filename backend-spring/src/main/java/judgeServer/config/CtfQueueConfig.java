@@ -1,6 +1,6 @@
 package judgeServer.config;
 
-import judgeServer.domain.challenge.mq.stream.RedisStreamErrors;
+import redis.mq.stream.RedisStreamErrors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

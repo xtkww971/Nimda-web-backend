@@ -1,11 +1,15 @@
 package com.nimda.cite;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.context.ActiveProfiles;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Spring Boot 애플리케이션 기본 테스트
@@ -25,7 +29,14 @@ class NimdaCiteApplicationTests {
     }
 }
 
+/**
+ * 실제 Redis(localhost:6379, application-test.yml)에 접속하는 통합 테스트.
+ * Redis가 없는 로컬에서 깨지지 않도록 REDIS_INTEGRATION_TEST가 있을 때만 돈다 (CI는 Redis 서비스를 띄우고 켠다).
+ */
+@Tag("redis-integration")
+@EnabledIfEnvironmentVariable(named = "REDIS_INTEGRATION_TEST", matches = "true")
 @SpringBootTest
+@ActiveProfiles("test")
 class RedisTest {
 
     @Autowired
@@ -43,6 +54,7 @@ class RedisTest {
 
         // Then
         String result = valueOperations.get(key);
-        System.out.println("Result: " + result); // helloRedis가 출력되어야 함
+        assertEquals(value, result);
+        redisTemplate.delete(key);
     }
 }

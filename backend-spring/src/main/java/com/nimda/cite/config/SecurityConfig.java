@@ -1,9 +1,10 @@
 package com.nimda.cite.config;
 
-import judgeServer.domain.challenge.instance.Config.InstanceProperties;
-import judgeServer.domain.challenge.instance.Proxy.InstanceProxy;
-import judgeServer.domain.challenge.instance.Proxy.SubdomainInstanceProxyFilter;
-import judgeServer.domain.challenge.instance.Repository.InstanceResultStore;
+import judgeServer.config.InstanceProperties;
+import judgeServer.domain.instance.Proxy.InstanceProxy;
+import judgeServer.domain.instance.Proxy.SubdomainInstanceProxyFilter;
+import judgeServer.domain.instance.Repository.InstanceResultStore;
+import redis.mq.producer.RedisCtfRequestProducer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -39,7 +40,7 @@ public class SecurityConfig {
     private InstanceProxy instanceProxy;
     // 결과 메시지에 userId가 없어져서, 소유권 확인은 발행 시 남긴 uuid → 사용자 매핑으로 한다.
     @Autowired
-    private judgeServer.domain.challenge.mq.producer.RedisCtfRequestProducer ctfRequestProducer;
+    private RedisCtfRequestProducer ctfRequestProducer;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -157,12 +158,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/cite/category/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/cite/category/**").hasRole("ADMIN")
 
-                        // CTF 문제 api (등록/삭제/공개전환은 관리자만)
-                        // 첨부파일 다운로드는 참가자가 쓰는 기능이라 아래 ADMIN 규칙보다 먼저 둔다
+                        // CTF 문제 api (등록/삭제/공개전환은 관리자와 DEV만)
+                        // 첨부파일 다운로드와 플래그 제출은 참가자가 쓰는 기능이라 아래 규칙보다 먼저 둔다
                         // (규칙은 먼저 걸리는 것이 이긴다).
                         .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*/download").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
+                        .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
 
                         // [우선순위 7] 나머지 모든 요청은 기본적으로 인증 필요
                         .anyRequest().authenticated()

@@ -6,6 +6,8 @@ import judgeServer.domain.challenge.dto.ChallengeDetailResponse;
 import judgeServer.domain.challenge.dto.ChallengeSummaryResponse;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.group.service.CtfTeamResolver;
+import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 참가자가 문제를 보는 조회 API (읽기 전용).
@@ -24,12 +28,14 @@ import java.util.List;
  *   GET /api/ctf/challenges/{code}  -> 문제 상세
  * </pre>
  *
- * <p>등록/삭제/공개전환은 관리자용 {@link ChallengeController}(단수 경로 {@code /api/ctf/challenge})에
+ * <p>등록/삭제/공개전환은 관리자와 DEV용 {@link ChallengeController}(단수 경로 {@code /api/ctf/challenge})에
  * 있다. 조회를 복수 경로로 분리한 것은 시큐리티 규칙 때문이다. 단수 경로에는 "POST/DELETE는
- * 관리자만"이 걸려 있어서, 참가자용 조회를 같은 경로에 두면 규칙이 서로 얽힌다.
+ * 관리자와 DEV만"이 걸려 있어서, 참가자용 조회를 같은 경로에 두면 규칙이 서로 얽힌다.
  *
- * <p>비공개(초안) 문제는 관리자에게만 보인다. 코드만 알면 열람되는 일이 없도록, 없는 문제와
- * 같은 404로 답한다.
+ * <p>비공개(초안) 문제는 출제 권한이 있는 관리자와 DEV에게만 보인다. 코드만 알면 열람되는 일이
+ * 없도록, 없는 문제와 같은 404로 답한다.
+ *
+ * <p>팀전이라 팀에 소속되지 않은 참가자에게는 목록·상세 모두 403으로 답한다 (관리자·DEV 제외).
  */
 @RestController
 @RequestMapping("/api/ctf/challenges")
@@ -37,15 +43,24 @@ import java.util.List;
 public class ChallengeQueryController {
 
     private final ChallengeRepository challengeRepository;
+    private final SolveRepository solveRepository;
+    private final CtfTeamResolver teamResolver;
 
-    /** 문제 목록. 관리자는 초안까지 함께 본다. */
+    /** 문제 목록. 관리자와 DEV는 초안까지 함께 본다. */
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal CustomUserDetails user) {
-        List<Challenge> challenges = isAdmin(user)
+        teamResolver.requireTeamOrStaff(user);
+        List<Challenge> challenges = canViewDrafts(user)
                 ? challengeRepository.findAllByOrderByIdAsc()
                 : challengeRepository.findByIsPublicTrueOrderByIdAsc();
 
-        return ApiResponse.ok(challenges.stream().map(ChallengeSummaryResponse::from).toList())
+        Map<Long, Long> solveCounts = solveRepository.countGroupByChallengeId().stream()
+                .collect(Collectors.toMap(SolveRepository.SolveCount::getChallengeId,
+                        SolveRepository.SolveCount::getSolves));
+
+        return ApiResponse.ok(challenges.stream()
+                        .map(c -> ChallengeSummaryResponse.from(c, solveCounts.getOrDefault(c.getId(), 0L)))
+                        .toList())
                 .toResponse();
     }
 
@@ -53,21 +68,23 @@ public class ChallengeQueryController {
     @GetMapping("/{code}")
     public ResponseEntity<?> detail(@PathVariable String code,
                                     @AuthenticationPrincipal CustomUserDetails user) {
+        teamResolver.requireTeamOrStaff(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !isAdmin(user)) {
+        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canViewDrafts(user)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
         }
-        return ApiResponse.ok(ChallengeDetailResponse.from(challenge)).toResponse();
+        return ApiResponse.ok(ChallengeDetailResponse.from(challenge,
+                solveRepository.countByChallengeId(challenge.getId()))).toResponse();
     }
 
-    private boolean isAdmin(CustomUserDetails user) {
+    private boolean canViewDrafts(CustomUserDetails user) {
         if (user == null) {
             return false;
         }
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
     }
 }

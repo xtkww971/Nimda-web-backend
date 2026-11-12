@@ -70,4 +70,14 @@ public class Group extends BaseTimeEntity {
         this.description = description;
     }
 
+    /** 멤버 목록에 추가한다. cascade로 함께 저장되고, 같은 트랜잭션의 응답에도 바로 반영된다. */
+    public void addMember(GroupMember member) {
+        this.members.add(member);
+    }
+
+    /** 멤버 목록에서 뺀다. orphanRemoval로 group_members 행도 지워진다. */
+    public boolean removeMemberByUserId(Long userId) {
+        return this.members.removeIf(m -> m.getUser().getId().equals(userId));
+    }
+
 }

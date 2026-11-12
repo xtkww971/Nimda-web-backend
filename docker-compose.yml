@@ -29,8 +29,8 @@ services:
     container_name: nimda-redis
     restart: always
     command: redis-server --requirepass ${REDIS_PASSWORD}
-    expose:
-      - "6379"
+    ports:
+      - "172.26.5.231:6379:6379"
     networks:
       - nimda-network
     volumes:
@@ -86,6 +86,9 @@ services:
       - AWS_S3_SECRET_KEY=${AWS_S3_SECRET_KEY}
       # JWT 토큰 설정
       - JWT_SECRET=${JWT_SECRET}
+      # Spring Security 기본 계정. application.yml에 기본값이 없어 빠지면 기동이 실패한다.
+      - SPRING_SECURITY_USER_NAME=${SPRING_SECURITY_USER_NAME}
+      - SPRING_SECURITY_USER_PASSWORD=${SPRING_SECURITY_USER_PASSWORD}
       # 이메일 설정
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
@@ -93,6 +96,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       # CTF 인스턴스 서브도메인 프록시 (inst-{uuid}.{도메인}). 비어 있으면 꺼진다.
       - CTF_INSTANCE_BASE_DOMAIN=${CTF_INSTANCE_BASE_DOMAIN:-}
+      # CTF 서버(EC2) 인스턴스 게이트웨이 "사설IP:포트" (VPC peering). 비어 있으면 결과 host:port로 직접 붙는다.
+      - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
@@ -136,6 +141,9 @@ services:
       - AWS_S3_SECRET_KEY=${AWS_S3_SECRET_KEY}
       # JWT 토큰 설정
       - JWT_SECRET=${JWT_SECRET}
+      # Spring Security 기본 계정. application.yml에 기본값이 없어 빠지면 기동이 실패한다.
+      - SPRING_SECURITY_USER_NAME=${SPRING_SECURITY_USER_NAME}
+      - SPRING_SECURITY_USER_PASSWORD=${SPRING_SECURITY_USER_PASSWORD}
       # 이메일 설정
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
@@ -143,6 +151,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       # CTF 인스턴스 서브도메인 프록시 (inst-{uuid}.{도메인}). 비어 있으면 꺼진다.
       - CTF_INSTANCE_BASE_DOMAIN=${CTF_INSTANCE_BASE_DOMAIN:-}
+      # CTF 서버(EC2) 인스턴스 게이트웨이 "사설IP:포트" (VPC peering). 비어 있으면 결과 host:port로 직접 붙는다.
+      - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
@@ -180,6 +190,10 @@ networks:
     # (기본값은 프로젝트명이 붙어 {프로젝트}_nimda-network가 된다)
     name: nimda-network
     driver: bridge
-  # Judge Server가 --internal로 미리 만든다. 없으면 backend가 뜨지 않는다.
+  # CTF 인스턴스 망. backend가 만들고 Judge Server는 이름으로 붙기만 한다.
+  # backend는 Judge Server 없이도 떠야 하므로 external로 두지 않는다.
+  # internal이라 이 망에 붙은 인스턴스 컨테이너는 밖으로 나가지 못한다.
   ctf-instances:
-    external: true
+    name: ctf-instances
+    driver: bridge
+    internal: true
