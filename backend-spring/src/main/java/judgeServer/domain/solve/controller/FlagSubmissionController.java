@@ -63,6 +63,12 @@ public class FlagSubmissionController {
             case NOT_FOUND -> {
                 return ApiResponse.fail("존재하지 않는 문제입니다.").toResponse(HttpStatus.NOT_FOUND);
             }
+            case CONTEST_NOT_STARTED -> {
+                return ApiResponse.fail("대회가 아직 시작되지 않았습니다.").toResponse(HttpStatus.FORBIDDEN);
+            }
+            case CONTEST_ENDED -> {
+                return ApiResponse.fail("대회가 종료되어 제출할 수 없습니다.").toResponse(HttpStatus.FORBIDDEN);
+            }
             case NO_TEAM -> {
                 return ApiResponse.fail(CtfTeamResolver.NO_TEAM_MESSAGE).toResponse(HttpStatus.FORBIDDEN);
             }

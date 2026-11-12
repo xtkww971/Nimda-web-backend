@@ -1,6 +1,7 @@
 package judgeServer.domain.group.service;
 
 import com.nimda.cite.user.security.CustomUserDetails;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * CTF는 팀전이다. 유저가 어느 팀에 속했는지 찾고, 팀이 없는 참가자의 문제 접근을 막는다.
+ * CTF는 팀전이다. 유저가 현재 대회에서 어느 팀에 속했는지 찾고, 팀이 없는 참가자의 문제 접근을 막는다.
  *
  * <p>관리자와 DEV는 출제·검수를 해야 하므로 팀이 없어도 통과시킨다. 다만 팀이 없으면 점수는 기록되지 않는다.
  */
@@ -23,9 +24,12 @@ public class CtfTeamResolver {
     public static final String NO_TEAM_MESSAGE = "팀에 소속되어 있지 않습니다. 운영진이 팀을 배정하면 문제가 공개됩니다.";
 
     private final GroupMemberRepository memberRepository;
+    private final ContestService contestService;
 
+    /** 현재 대회에서 속한 팀. 지난 대회 팀은 보지 않는다. */
     public Optional<Long> findTeamId(Long userId) {
-        List<Long> teamIds = memberRepository.findGroupIdsByUserId(userId);
+        List<Long> teamIds = memberRepository.findGroupIdsByUserIdInContest(userId,
+                contestService.currentContestId().orElse(null));
         return teamIds.isEmpty() ? Optional.empty() : Optional.of(teamIds.get(0));
     }
 

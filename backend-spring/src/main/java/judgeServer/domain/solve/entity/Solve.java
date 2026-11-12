@@ -27,6 +27,10 @@ public class Solve {
     @Column(name = "team_id")
     private Long teamId;
 
+    /** 정답을 낸 대회(ctf_contests.id). 배점 감소는 대회 안의 해결 수로 계산한다. 대회가 없을 때의 기록은 NULL이다. */
+    @Column(name = "contest_id")
+    private Long contestId;
+
     /** 맞힌 시점의 점수. 이후 해결자가 늘어도 변하지 않는다. */
     @Column(name = "awarded_points", nullable = false)
     private Integer awardedPoints;

@@ -3,6 +3,7 @@ package judgeServer.domain.challenge.download;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.group.service.CtfTeamResolver;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.challenge.entity.Challenge;
 import redis.mq.message.CtfResultMessage;
 import redis.mq.message.RequestStatus;
@@ -36,6 +37,7 @@ public class ChallengeDownloadController {
     private final ChallengeDownloadStore resultStore;
     private final ChallengeDownloadUrlCache urlCache;
     private final CtfTeamResolver teamResolver;
+    private final ContestService contestService;
 
     // 문제 코드로 다운로드 링크 요청
     @PostMapping("/{code}/download")
@@ -43,6 +45,7 @@ public class ChallengeDownloadController {
                                      @AuthenticationPrincipal CustomUserDetails user) {
         // 팀전이라 팀이 없는 참가자는 문제 파일을 받을 수 없다 (관리자·DEV 제외).
         teamResolver.requireTeamOrStaff(user);
+        contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 

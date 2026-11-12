@@ -2,6 +2,7 @@ package redis.mq.consumer;
 
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.solve.service.FlagJudgeService;
 import judgeServer.domain.solve.service.FlagSubmissionService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,8 @@ import redis.mq.stream.StreamFields;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -97,15 +100,28 @@ public class FlagSubmissionConsumer
         Long userId = Long.valueOf(StreamFields.required(fields, "userId", "플래그 제출"));
         boolean canAccessDrafts = Boolean.parseBoolean(fields.get("canAccessDrafts"));
         String flagHash = StreamFields.required(fields, "flagHash", "플래그 제출");
+        LocalDateTime submittedAt = parseSubmittedAt(fields.get("submittedAt"));
 
         SubmissionVerdict verdict;
         try {
-            verdict = judgeService.judge(challengeId, userId, canAccessDrafts, flagHash);
+            verdict = judgeService.judge(challengeId, userId, canAccessDrafts, flagHash, submittedAt);
         } catch (Exception e) {
             log.error("플래그 채점 실패: submissionId={}, challengeId={}: {}", submissionId, challengeId, e.getMessage(), e);
             verdict = SubmissionVerdict.of(SubmissionVerdict.Status.ERROR);
         }
         submissionService.saveVerdict(submissionId, userId, verdict);
+    }
+
+    // 배포 직후 이전 버전이 넣은 메시지에는 제출 시각이 없다. 그때는 지금 시각으로 판정한다.
+    private static LocalDateTime parseSubmittedAt(String epochMillis) {
+        if (epochMillis == null || epochMillis.isBlank()) {
+            return LocalDateTime.now(ContestService.KST);
+        }
+        try {
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epochMillis)), ContestService.KST);
+        } catch (NumberFormatException e) {
+            return LocalDateTime.now(ContestService.KST);
+        }
     }
 
     @Override

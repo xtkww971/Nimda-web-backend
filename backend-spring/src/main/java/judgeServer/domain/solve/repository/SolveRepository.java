@@ -4,6 +4,7 @@ import judgeServer.domain.scoreboard.dto.RecentSolveResponse;
 import judgeServer.domain.solve.entity.Solve;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,12 +28,22 @@ public interface SolveRepository extends JpaRepository<Solve, Long> {
 
     boolean existsByChallengeIdAndTeamId(Long challengeId, Long teamId);
 
-    long countByChallengeId(Long challengeId);
+    /** 대회 안에서 이 문제를 푼 팀 수. 배점 감소의 기준이다. */
+    @Query("select count(s) from Solve s where s.challengeId = :challengeId and (s.contestId = :contestId or (:contestId is null and s.contestId is null))")
+    long countInContest(@Param("challengeId") Long challengeId, @Param("contestId") Long contestId);
 
     void deleteByChallengeId(Long challengeId);
 
-    @Query("select s.challengeId as challengeId, count(s) as solves from Solve s group by s.challengeId")
-    List<SolveCount> countGroupByChallengeId();
+    @Query("select s.challengeId as challengeId, count(s) as solves from Solve s where (s.contestId = :contestId or (:contestId is null and s.contestId is null)) group by s.challengeId")
+    List<SolveCount> countGroupByChallengeIdInContest(@Param("contestId") Long contestId);
+
+    /** 대회 결과 스냅샷용. 해결 시각 오름차순이라 문제별 첫 기록이 First Blood다. */
+    List<Solve> findByContestIdOrderBySolvedAtAscIdAsc(Long contestId);
+
+    /** 첫 대회를 만들 때, 대회 없이 쌓인 팀 정답 기록을 그 대회에 편입한다. */
+    @Modifying
+    @Query("update Solve s set s.contestId = :contestId where s.contestId is null and s.teamId is not null")
+    int assignOrphansToContest(@Param("contestId") Long contestId);
 
     /** 문제를 지울 때 점수를 다시 계산해야 하는 팀들. */
     @Query("select distinct s.teamId from Solve s where s.challengeId = :challengeId and s.teamId is not null")

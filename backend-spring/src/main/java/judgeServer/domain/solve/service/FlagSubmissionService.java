@@ -59,7 +59,9 @@ public class FlagSubmissionService {
                 "challengeId", String.valueOf(challengeId),
                 "userId", String.valueOf(userId),
                 "canAccessDrafts", String.valueOf(canAccessDrafts),
-                "flagHash", FlagHasher.hash(flag)));
+                "flagHash", FlagHasher.hash(flag),
+                // 마감 판정 기준. 큐가 밀려 종료 직후에 채점돼도 종료 전에 낸 제출은 인정한다.
+                "submittedAt", String.valueOf(System.currentTimeMillis())));
         redisTemplate.opsForStream().trim(streamKey, STREAM_MAX_LENGTH, true);
 
         return new Submission(submissionId, awaitVerdict(submissionId, userId));

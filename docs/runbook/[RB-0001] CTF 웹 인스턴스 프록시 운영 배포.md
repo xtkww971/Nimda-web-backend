@@ -20,8 +20,8 @@
 남은 것은 서버·인프라 작업(4절)과 Judge Server 작업(3절 하단)이다.
 
 * `inst-*.nimda.kr`이 DNS에 없고, 인증서가 `api.nimda.kr` 하나다 → 단계 4·5
-* `ctf-instances`가 없고, `nimda-network` 이름이 운영에서 다르다 → 단계 2·3
-* CI가 `deploy.sh`만 보내서 compose·nginx 변경이 서버에 안 간다 → 단계 6
+* `ctf-instances`가 없고, `nimda-network` 이름이 운영에서 다르다 → compose가 만든다(R11). 단계 2·3
+* CI가 `deploy.sh`만 보내서 compose 변경이 서버에 안 갔다 → 이제 compose도 보낸다(R11). nginx는 아직 수동 → 단계 6
 
 3절 표의 Judge 항목(J1·J2)이 끝나야 실제 접속이 된다.
 
@@ -30,9 +30,9 @@
 * **필요 권한:** 운영 서버 SSH + `sudo`. `nimda.kr` DNS 관리 권한. 서버 `.env` 수정 권한.
 * **주의사항:**
 
-  > ⚠️ `ctf-instances` 네트워크가 없으면 backend 컨테이너가 아예 안 뜬다
-  > (`network ctf-instances declared as external, but could not be found`).
-  > `deploy.sh`는 새 색상 기동에 실패하면 트래픽을 안 넘기고 멈추지만, **네트워크 생성(4절 단계 2)을 배포보다 먼저** 한다.
+  > ⚠️ 서버에서 compose를 손으로 고치거나 네트워크를 직접 만들지 않는다. 서버 상태는 레포의
+  > `docker-compose.yml`·`deploy.sh`와 서버 `.env`로만 정한다(R11). 쉘 heredoc으로 compose를 붙여 넣으면
+  > `${...}`가 풀려 비밀값이 빈칸으로 박힌다(2026-11-11 장애 원인).
 
   > ⚠️ `nimda-network` 이름을 고정하면(3절 R5) 네트워크가 새로 만들어진다. mysql·redis·backend·nginx를
   > 전부 내렸다 올려야 하므로 **짧은 다운타임이 생긴다.** 사용자가 적은 시간에 한다. 볼륨은 그대로 남는다(`down -v` 금지).
@@ -45,7 +45,7 @@
 
 | # | 항목 | 파일 | 왜 필요한가 | 상태 |
 |---|---|---|---|---|
-| R1 | backend-blue/green을 `ctf-instances`(external)에 연결 | `docker-compose.yml` | 컨테이너 이름을 embedded DNS로 풀려면 같은 망에 있어야 한다 | 완료 (단계 1) |
+| R1 | backend-blue/green을 `ctf-instances`에 연결 (망은 compose가 `internal`로 만든다. external 아님 — backend가 Judge 없이도 떠야 한다) | `docker-compose.yml` | 컨테이너 이름을 embedded DNS로 풀려면 같은 망에 있어야 한다 | 완료 (단계 1) |
 | R2 | `CTF_INSTANCE_BASE_DOMAIN`, `AUTH_COOKIE_DOMAIN` 전달 | `docker-compose.yml` | `environment`에 없으면 `.env`에 넣어도 컨테이너에 안 들어간다. 비어 있으면 프록시가 꺼진다 | 완료 (단계 2) |
 | R3 | backend에 Redis 접속 정보 전달 | `docker-compose.yml` | 운영 compose에 Redis 설정이 없어서 `localhost:6379`, 비밀번호 없음으로 붙었다. 운영 redis는 `--requirepass`라 결과·소유자 조회가 전부 실패한다. host는 서비스 이름 `redis`로 고정(`.env`의 `localhost`는 IDE용), 비밀번호는 redis 서버와 같은 `REDIS_PASSWORD`를 쓴다. 로컬(비밀번호 없음)은 기본값이 빈 값이라 그대로 된다 | 완료 |
 | R4 | 운영 프로필 지정 | `application.yml` | 기본값 `spring.profiles.active: local`. 코드를 올릴 때 `local`을 지워서 올리는 것으로 운영한다 | 해당 없음 |
@@ -54,6 +54,7 @@
 | R7 | 443에 인스턴스 전용 `server` 블록 분리 | `nginx/nginx.conf` | 아래 상세 | 완료 |
 | R8 | `server.forward-headers-strategy: native` | `application.yml` | `accessUrl`이 `request.getScheme()`을 쓴다. nginx 뒤에선 `http`로 잡혀 `http://inst-...`가 만들어졌다. 해당 엔드포인트는 지금 주석 처리라 직접 검증은 못 했다 | 완료 (미검증) |
 | R9 | `client_max_body_size 10m` | `nginx/nginx.conf` | `application.yml` multipart 주석은 "nginx와 일치"인데 nginx엔 설정이 없어서 기본 1MB였다. 1MB 넘는 업로드가 API·인스턴스 모두 413 | 완료 |
+| R11 | 배포 매니페스트화 | `ci.yml`, `deploy.sh`, `.env.example`, `.gitattributes` | CI가 `docker-compose.yml`도 보낸다. `deploy.sh`가 ① `.env` 필수 키가 비면 멈추고 ② mysql·redis를 compose 정의에 맞춘 뒤(`--wait`) ③ 새 색상을 띄우고 ④ nginx도 정의에 맞춘다. 정의가 그대로면 ②④는 아무것도 안 한다. 배포 파일은 LF 고정 | 완료 |
 | R10 | JVM DNS 캐시 끄기 (`networkaddress.cache.ttl`/`negative.ttl` = 0) | `NimdaCiteApplication.java` | JVM이 이름 조회를 30초(없음은 10초) 캐시한다. 인스턴스를 재생성하면 IP가 바뀌는데, **옛 IP를 다른 컨테이너가 받으면 30초 동안 요청이 그 컨테이너로 갔다**(로컬 재현: 소유권 검사 통과 후 남의 컨테이너가 응답). 재생성 직후엔 10초간 502도 났다 | 완료 |
 
 ### R7 상세 — 전에 443 블록이 인스턴스에 하던 일
@@ -85,6 +86,10 @@ WebSocket 헤더는 넣지 않았다. backend의 `InstanceProxy`가 Java `HttpCl
 
 ### Judge Server 쪽 (이 레포 밖)
 
+Judge 레포 `docs/issue/`에 이슈로 정리돼 있다.
+J1 → `web-instance-network-issue.md`(#35), J2·J3 → `web-backend-integration-infra-issue.md`,
+J4 → `web-instance-alias-issue.md`, J5 → `web-instance-existing-expires-issue.md`.
+
 | # | 항목 | 왜 필요한가 |
 |---|---|---|
 | J1 | `#35` 구현·배포 | 지금 agent는 web 인스턴스를 `CTF_INSTANCE_HOST=127.0.0.1` + host 포트로 띄운다. 2026-10-28 기준 어느 브랜치에도 `ctf-instances` 코드가 없다 |
@@ -110,32 +115,22 @@ cp .env ~/rb0001-env.bak
 cp nginx/nginx.conf ~/rb0001-nginx.conf.bak
 ```
 
-### 단계 2. ctf-instances 네트워크 생성
+### 단계 2. ctf-instances 네트워크
 
-인터넷으로 못 나가는(`--internal`) bridge 네트워크를 만든다. Judge `#35`의 runbook과 같은 명령이다. 이미 있으면 "already exists"가 나고, 그대로 두면 된다.
+**직접 만들지 않는다.** `docker-compose.yml`이 `name: ctf-instances`, `internal: true`로 정의하고, 배포(단계 9) 때 compose가 만든다.
 
-```bash
-docker network create --internal ctf-instances
-docker network inspect ctf-instances -f '{{.Internal}}'   # true 여야 한다
-```
-
-### 단계 3. nimda-network 이름 확인
+이미 손으로 만든 `ctf-instances`가 있으면 compose 라벨이 없어 충돌하므로, 붙은 컨테이너가 없을 때 한 번 지운다.
 
 ```bash
-docker network ls --filter name=nimda-network --format '{{.Name}}'
+docker network inspect ctf-instances -f '{{index .Labels "com.docker.compose.network"}}' 2>/dev/null
+# 빈 줄이 나오면 손으로 만든 망이다 → docker network rm ctf-instances
 ```
 
-* `nimda-network`가 나오면 넘어간다.
-* `app_nimda-network`처럼 접두사가 붙어 있으면, R5가 반영된 compose로 **전체 스택을 한 번 내렸다 올린다.**
-  볼륨을 지우는 `-v`는 절대 붙이지 않는다.
+### 단계 3. nimda-network 이름
 
-```bash
-git pull                       # R5가 반영된 docker-compose.yml을 받는다 (단계 6 참고)
-docker compose down            # -v 금지. 다운타임 시작
-docker compose up -d mysql redis
-docker compose up -d backend-$(grep -q blue nginx/conf.d/active-backend.inc && echo blue || echo green) nginx
-docker network ls --filter name=nimda-network --format '{{.Name}}'   # nimda-network
-```
+이것도 compose가 정한다(`name: nimda-network`). 운영이 `app_nimda-network`면 **첫 배포 때 `deploy.sh`가
+mysql·redis·nginx를 새 망으로 재생성한다.** 그동안 짧은 다운타임이 생긴다. 볼륨(`app_mysql_data` 등)은 그대로다.
+따로 `docker compose down`을 하지 않는다.
 
 ### 단계 4. 와일드카드 DNS
 
@@ -152,28 +147,59 @@ dig +short inst-dnscheck.nimda.kr      # 43.200.36.32 가 나와야 한다
 ### 단계 5. 와일드카드 인증서
 
 와일드카드 인증서는 HTTP-01(웹루트)로는 못 받는다. **DNS-01**로 받는다.
-아래는 수동 방식이고, 안내되는 TXT 레코드를 DNS에 넣고 진행한다.
+`nimda.kr` DNS(호스팅케이알)는 API가 없어서 TXT 레코드를 사람이 넣는다.
+`scripts/certbot-dns-hook.sh`(CI가 `~/app/scripts/`로 보낸다)가 TXT 값을 파일로 남기고 승인 파일을 기다리므로,
+certbot을 터미널 없이 띄워 둘 수 있다. 이름은 `--cert-name nimda.kr`로 고정한다(인스턴스 블록이 `live/nimda.kr/`를 본다).
+`nimda.kr` 자체는 프론트(Vercel)라 넣지 않고 `*.nimda.kr`만 받는다.
 
 ```bash
-docker run --rm -it \
+cd ~/app
+mkdir -p ~/certbot-dns && rm -f ~/certbot-dns/*
+docker rm -f certbot-wildcard 2>/dev/null
+docker run -d --name certbot-wildcard \
   -v "$PWD/certbot/conf:/etc/letsencrypt" \
-  certbot/certbot certonly --manual --preferred-challenges dns \
-  -d nimda.kr -d '*.nimda.kr'
+  -v "$PWD/scripts:/hooks/bin:ro" \
+  -v "$HOME/certbot-dns:/hooks/state" \
+  certbot/certbot:v5.5.0 certonly --manual --preferred-challenges dns \
+  --manual-auth-hook /hooks/bin/certbot-dns-hook.sh \
+  --non-interactive --agree-tos --key-type ecdsa \
+  --cert-name nimda.kr -d '*.nimda.kr'
+
+cat ~/certbot-dns/txt-records     # _acme-challenge.nimda.kr TXT <값> → 호스팅케이알에 TXT 레코드로 추가
+dig +short TXT _acme-challenge.nimda.kr @ns1.hosting.co.kr   # 값이 보이면
+touch ~/certbot-dns/go            # 승인 → certbot이 검증을 진행한다 (1시간 안에)
+docker logs -f certbot-wildcard   # "Successfully received certificate"
+sudo openssl x509 -in certbot/conf/live/nimda.kr/fullchain.pem -noout -enddate -ext subjectAltName
+docker rm certbot-wildcard
 ```
 
-> 수동 DNS-01은 **자동 갱신이 안 된다.** 90일마다 다시 하거나, DNS 제공자의 certbot 플러그인으로 바꾼다.
+검증이 끝나면 TXT 레코드는 지워도 된다.
+
+> 수동 DNS-01은 **자동 갱신이 안 된다.** 만료(발급 후 90일) 전에 위 절차를 다시 한다.
 > 발급된 경로(`live/nimda.kr/`)는 R7의 인스턴스 블록 `ssl_certificate`에 쓴다.
+
+> ⚠️ 2026-11-11 확인: `live/api.nimda.kr` 인증서는 **2026-08-01에 만료됐다**(웹루트 방식인데 갱신 cron이 없다).
+> 지금 브라우저는 Vercel을 거쳐 `http://43.200.36.32`로 API를 불러서 드러나지 않았다.
+> `*.nimda.kr` 인증서가 `api.nimda.kr`도 덮으므로, API 블록도 `live/nimda.kr/`를 쓰게 바꾸는 것을 검토한다.
+
+### 단계 5-1. Lightsail 방화벽 443
+
+서버는 Lightsail 인스턴스이고, 2026-11-11 기준 방화벽이 **22·80만 열려 있다.** 참가자 브라우저가
+`https://inst-*.nimda.kr`에 직접 붙으므로 443(TCP)을 연다. Lightsail 콘솔 → 인스턴스 → 네트워킹 → IPv4/IPv6 방화벽 → HTTPS 추가.
+AWS CLI 권한이 있으면 아래와 같다(기존 규칙을 통째로 바꾸므로 22·80을 같이 적는다).
+
+```bash
+aws lightsail put-instance-public-ports --instance-name <인스턴스 이름> --port-infos \
+  fromPort=22,toPort=22,protocol=tcp fromPort=80,toPort=80,protocol=tcp fromPort=443,toPort=443,protocol=tcp
+```
 
 ### 단계 6. 서버 레포·설정 파일 반영
 
-**CI는 `deploy.sh`만 서버로 복사한다.** `docker-compose.yml`과 `nginx/nginx.conf` 변경은 자동으로 안 간다.
-서버에서 직접 최신으로 맞춘다.
+CI가 `deploy.sh`와 `docker-compose.yml`을 서버로 복사한다(R11). 서버 `~/app`은 git 레포가 아니라 `git pull`은 안 된다.
 
-```bash
-cd /home/ubuntu/app
-git pull
-git log --oneline -1
-```
+CI가 `nginx/nginx.conf`와 `scripts/certbot-dns-hook.sh`도 보낸다. 인스턴스 블록이 와일드카드 인증서(단계 5)를 참조하므로,
+**단계 5가 끝난 뒤에 main에 머지한다.** 인증서가 없으면 `deploy.sh`의 `nginx -t`가 실패하고, reload 없이 기존 색상으로 되돌린 뒤 멈춘다.
+`nginx/conf.d/active-backend.inc`는 `deploy.sh`가 관리하는 서버 상태라 보내지 않는다. 서버에서 파일을 손으로 고치지 않는다.
 
 ### 단계 7. .env 값 추가
 
@@ -182,9 +208,18 @@ git log --oneline -1
 CTF_INSTANCE_BASE_DOMAIN=nimda.kr
 # 로그인 쿠키를 inst-*.nimda.kr에도 보낸다 (R2)
 AUTH_COOKIE_DOMAIN=nimda.kr
+# CTF 서버(EC2)가 다른 호스트라 web 인스턴스는 EC2 게이트웨이를 거친다 (VPC peering 사설 IP)
+# docs/issue/instance-split-host-access-issue.md 설계 A. 게이트웨이가 뜬 뒤에 넣는다.
+CTF_INSTANCE_GATEWAY=<EC2 사설IP>:<게이트웨이 포트>
 ```
 
+> 2026-11-11부터 CTF 서버가 EC2로 분리됐다. 이 경우 R1(`ctf-instances` 연결)과 5절 ① 검증은 의미가 없고,
+> 대신 backend 컨테이너에서 게이트웨이로 닿는지 본다:
+> `docker exec backend-green curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Ctf-Target: <alias>:<port>' http://$CTF_INSTANCE_GATEWAY/`
+
 backend의 Redis 비밀번호는 redis 서버와 같은 `REDIS_PASSWORD`를 쓴다(R3). 이미 있는 값이라 추가할 것은 없다.
+
+필요한 키 전체는 레포의 `.env.example`이다. 필수 키가 비어 있으면 `deploy.sh`가 배포를 멈춘다.
 
 ### 단계 8. nginx 반영
 
@@ -279,7 +314,7 @@ docker network rm ctf-instances
 
 ## 8. 이번에 하지 않는 것
 
-* **도메인 분리(ADR-0017 2-1).** `inst-{uuid}.nimda-ctf.kr` 별도 도메인. 이게 되면 `AUTH_COOKIE_DOMAIN`을 넓힐 필요가 없어진다.
+* **도메인 분리(ADR-0017 2-1).** `inst-{uuid}.nimda-ctf.kr` 별도 도메인. 이게 되어도 `nimda.kr`과 `ctf.nimda.kr`의 로그인 공유를 위해 `AUTH_COOKIE_DOMAIN=nimda.kr`은 유지한다.
   지금 CORS가 `https://*.nimda.kr`을 credentials와 함께 허용하므로 인스턴스 출처도 플랫폼 API를 부를 수 있는데, 이것도 도메인 분리로 같이 닫힌다.
 * **응답 Set-Cookie 제거.** 문제 컨테이너가 `Domain=.nimda.kr` 쿠키를 심는 것 막기.
 * **문제 응답에 붙는 Spring Security 헤더.** 프록시 응답에 backend가 `X-Frame-Options: DENY` 등을 덧붙인다.
