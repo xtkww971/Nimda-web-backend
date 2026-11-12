@@ -2,6 +2,7 @@ package judgeServer.domain.solve.service;
 
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import judgeServer.domain.solve.entity.Solve;
 import judgeServer.domain.solve.repository.SolveRepository;
@@ -23,23 +24,28 @@ public class SolveRecorder {
 
     private final ChallengeRepository challengeRepository;
     private final SolveRepository solveRepository;
+    private final CtfTeamScoreRepository teamScoreRepository;
 
+    /** 팀 단위로 기록한다. 같은 팀원이 이미 맞힌 문제면 ALREADY_SOLVED이고 점수는 다시 주지 않는다. */
     @Transactional
-    public SubmissionVerdict record(Long challengeId, Long userId) {
+    public SubmissionVerdict record(Long challengeId, Long userId, Long teamId) {
         Challenge challenge = challengeRepository.findByIdForUpdate(challengeId).orElse(null);
         if (challenge == null) {
             return SubmissionVerdict.of(SubmissionVerdict.Status.ERROR);
         }
-        if (solveRepository.existsByChallengeIdAndUserId(challengeId, userId)) {
+        if (solveRepository.existsByChallengeIdAndTeamId(challengeId, teamId)) {
             return SubmissionVerdict.of(SubmissionVerdict.Status.ALREADY_SOLVED);
         }
 
         int awarded = challenge.currentPoints(solveRepository.countByChallengeId(challengeId));
-        solveRepository.save(Solve.builder()
+        Solve solve = solveRepository.save(Solve.builder()
                 .challengeId(challengeId)
                 .userId(userId)
+                .teamId(teamId)
                 .awardedPoints(awarded)
                 .build());
+        // 같은 트랜잭션에서 팀 점수판에 더한다. 정답 기록이 롤백되면 점수도 같이 롤백된다.
+        teamScoreRepository.addSolve(teamId, awarded, solve.getSolvedAt());
         return new SubmissionVerdict(SubmissionVerdict.Status.CORRECT, awarded);
     }
 }
