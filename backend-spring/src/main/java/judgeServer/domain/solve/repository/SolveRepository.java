@@ -1,8 +1,11 @@
 package judgeServer.domain.solve.repository;
 
+import judgeServer.domain.scoreboard.dto.RecentSolveResponse;
 import judgeServer.domain.solve.entity.Solve;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,7 +18,14 @@ public interface SolveRepository extends JpaRepository<Solve, Long> {
         Long getSolves();
     }
 
-    boolean existsByChallengeIdAndUserId(Long challengeId, Long userId);
+    /** 팀 안에서 멤버 한 명이 기여한 해결 수와 점수. */
+    interface MemberContribution {
+        Long getUserId();
+        Long getSolveCount();
+        Long getPoints();
+    }
+
+    boolean existsByChallengeIdAndTeamId(Long challengeId, Long teamId);
 
     long countByChallengeId(Long challengeId);
 
@@ -23,4 +33,26 @@ public interface SolveRepository extends JpaRepository<Solve, Long> {
 
     @Query("select s.challengeId as challengeId, count(s) as solves from Solve s group by s.challengeId")
     List<SolveCount> countGroupByChallengeId();
+
+    /** 문제를 지울 때 점수를 다시 계산해야 하는 팀들. */
+    @Query("select distinct s.teamId from Solve s where s.challengeId = :challengeId and s.teamId is not null")
+    List<Long> findTeamIdsByChallengeId(@Param("challengeId") Long challengeId);
+
+    @Query("""
+            select s.userId as userId, count(s) as solveCount, sum(s.awardedPoints) as points
+            from Solve s where s.teamId = :teamId group by s.userId
+            """)
+    List<MemberContribution> findContributionsByTeamId(@Param("teamId") Long teamId);
+
+    /** 팀의 최근 해결. 개수는 Pageable로 자른다. */
+    @Query("""
+            select new judgeServer.domain.scoreboard.dto.RecentSolveResponse(
+                s.solvedAt, u.nickname, c.code, c.title, s.awardedPoints)
+            from Solve s
+                join User u on u.id = s.userId
+                join Challenge c on c.id = s.challengeId
+            where s.teamId = :teamId
+            order by s.solvedAt desc
+            """)
+    List<RecentSolveResponse> findRecentByTeamId(@Param("teamId") Long teamId, Pageable pageable);
 }
