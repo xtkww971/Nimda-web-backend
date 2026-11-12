@@ -4,8 +4,8 @@ import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.enums.FlagType;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.group.service.CtfTeamResolver;
-import judgeServer.domain.schedule.enums.ContestPhase;
-import judgeServer.domain.schedule.service.ContestScheduleService;
+import judgeServer.domain.contest.enums.ContestPhase;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class FlagJudgeService {
     private final ChallengeRepository challengeRepository;
     private final SolveRecorder solveRecorder;
     private final CtfTeamResolver teamResolver;
-    private final ContestScheduleService scheduleService;
+    private final ContestService contestService;
 
     /**
      * @param submittedAt 참가자가 제출한 시각(KST). 큐에서 늦게 꺼내도 마감 판정은 이 시각으로 한다.
@@ -35,7 +35,7 @@ public class FlagJudgeService {
             return SubmissionVerdict.of(SubmissionVerdict.Status.NOT_FOUND);
         }
         // 대회 시간 밖의 제출은 서버가 거부한다 (프론트 비활성화만으로는 부족). 관리자·DEV는 검수를 위해 채점만 하고 기록하지 않는다.
-        ContestPhase phase = scheduleService.phaseAt(submittedAt);
+        ContestPhase phase = contestService.phaseAt(submittedAt);
         if (!phase.acceptsSubmissions() && !canAccessDrafts) {
             return SubmissionVerdict.of(phase == ContestPhase.UPCOMING
                     ? SubmissionVerdict.Status.CONTEST_NOT_STARTED
@@ -65,6 +65,6 @@ public class FlagJudgeService {
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) || teamId == null || !phase.acceptsSubmissions()) {
             return SubmissionVerdict.of(SubmissionVerdict.Status.CORRECT);
         }
-        return solveRecorder.record(challengeId, userId, teamId);
+        return solveRecorder.record(challengeId, userId, teamId, contestService.currentContestId().orElse(null));
     }
 }

@@ -3,6 +3,7 @@ package judgeServer.domain.group.service;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.dto.*;
 import judgeServer.domain.group.entity.Group;
 import judgeServer.domain.group.repository.GroupRepository;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
  * <p>일반 그룹 API({@link GroupService})와 다른 점:
  * <ul>
  *   <li>운영자는 팀 멤버가 되지 않는다. 팀장(LEADER)은 운영자가 지정한다.</li>
- *   <li>Activity가 CTF 하나뿐이므로 한 유저는 한 팀에만 속할 수 있다.</li>
+ *   <li>팀은 현재 대회에 묶인다. 한 유저는 대회마다 한 팀에만 속할 수 있고, 팀 이름은 대회 안에서만 겹치지 않으면 된다.</li>
  *   <li>승인(APPROVED)된 유저만 팀에 넣을 수 있다.</li>
  *   <li>팀을 만들 때 팀 점수판(ctf_team_scores) 행을 같이 만든다.</li>
  * </ul>
@@ -42,10 +43,11 @@ public class AdminTeamService {
     private final GroupJoinRequestRepository joinRequestRepository;
     private final UserRepository userRepository;
     private final CtfTeamScoreRepository teamScoreRepository;
+    private final ContestService contestService;
 
-    /** 팀 목록 (멤버 포함, 팀 이름 순). */
+    /** 현재 대회의 팀 목록 (멤버 포함, 팀 이름 순). */
     public List<TeamResponse> getTeams() {
-        return groupRepository.findAllWithMembers().stream()
+        return groupRepository.findAllWithMembersInContest(currentContestId()).stream()
                 .sorted(Comparator.comparing(Group::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(TeamResponse::from)
                 .toList();
@@ -55,17 +57,18 @@ public class AdminTeamService {
         return TeamResponse.from(groupRepository.findByIdWithMembers(teamId).orElseThrow(this::teamNotFound));
     }
 
-    /** 아직 팀이 없는 승인된 참가자. keyword는 닉네임·아이디 부분 일치. */
+    /** 현재 대회에서 아직 팀이 없는 승인된 참가자. keyword는 닉네임·아이디 부분 일치. */
     public List<UnassignedUserResponse> getUnassignedUsers(String keyword) {
         String normalized = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-        return memberRepository.findUnassignedApprovedUsers(normalized).stream()
+        return memberRepository.findUnassignedApprovedUsers(normalized, currentContestId()).stream()
                 .map(UnassignedUserResponse::from)
                 .toList();
     }
 
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
-        validateUniqueName(request.getName(), null);
+        Long contestId = currentContestId();
+        validateUniqueName(request.getName(), contestId, null);
 
         Long leaderId = request.getLeaderUserId();
         LinkedHashSet<Long> memberIds = new LinkedHashSet<>();
@@ -79,12 +82,13 @@ public class AdminTeamService {
             throw badRequest("멤버 수(" + memberIds.size() + ")가 최대 인원(" + request.getCapacity() + ")을 넘습니다.");
         }
 
-        Map<Long, User> users = loadAssignableUsers(memberIds);
+        Map<Long, User> users = loadAssignableUsers(memberIds, contestId);
 
         Group team = Group.builder()
                 .name(request.getName())
                 .capacity(request.getCapacity())
                 .description(request.getDescription())
+                .contestId(contestId)
                 .build();
         for (Long userId : memberIds) {
             team.addMember(GroupMember.builder()
@@ -102,7 +106,7 @@ public class AdminTeamService {
     @Transactional
     public TeamResponse updateTeam(Long teamId, GroupUpdateRequest request) {
         Group team = lockTeam(teamId);
-        validateUniqueName(request.getName(), teamId);
+        validateUniqueName(request.getName(), team.getContestId(), teamId);
         if (request.getCapacity() < team.getMembers().size()) {
             throw badRequest("현재 멤버 수(" + team.getMembers().size() + ")보다 최대 인원을 작게 할 수 없습니다.");
         }
@@ -130,7 +134,7 @@ public class AdminTeamService {
             throw badRequest("팀 정원(" + team.getCapacity() + ")을 넘습니다. 남은 자리: " + Math.max(remaining, 0) + "명");
         }
 
-        Map<Long, User> users = loadAssignableUsers(userIds);
+        Map<Long, User> users = loadAssignableUsers(userIds, team.getContestId());
         for (Long userId : userIds) {
             team.addMember(GroupMember.builder().group(team).user(users.get(userId)).role(MemberRole.MEMBER).build());
         }
@@ -162,8 +166,8 @@ public class AdminTeamService {
         return TeamResponse.from(team);
     }
 
-    /** 존재하고, 승인됐고, 아직 어느 팀에도 속하지 않은 유저만 돌려준다. 하나라도 어긋나면 404/400/409. */
-    private Map<Long, User> loadAssignableUsers(Collection<Long> userIds) {
+    /** 존재하고, 승인됐고, 그 대회에서 아직 어느 팀에도 속하지 않은 유저만 돌려준다. 하나라도 어긋나면 404/400/409. */
+    private Map<Long, User> loadAssignableUsers(Collection<Long> userIds, Long contestId) {
         if (userIds.isEmpty()) {
             return Map.of();
         }
@@ -183,7 +187,7 @@ public class AdminTeamService {
             throw badRequest("승인되지 않은 유저는 팀에 넣을 수 없습니다: " + String.join(", ", notApproved));
         }
 
-        List<String> alreadyInTeam = memberRepository.findByUserIdIn(userIds).stream()
+        List<String> alreadyInTeam = memberRepository.findInContestByUserIds(userIds, contestId).stream()
                 .map(m -> m.getUser().getNickname())
                 .distinct()
                 .toList();
@@ -198,11 +202,13 @@ public class AdminTeamService {
         return groupRepository.findByIdForUpdate(teamId).orElseThrow(this::teamNotFound);
     }
 
-    private void validateUniqueName(String name, Long excludeTeamId) {
-        boolean duplicated = (excludeTeamId == null)
-                ? groupRepository.existsByName(name)
-                : groupRepository.existsByNameAndIdNot(name, excludeTeamId);
-        if (duplicated) {
+    private Long currentContestId() {
+        return contestService.currentContestId().orElse(null);
+    }
+
+    // 팀 이름은 같은 대회 안에서만 겹치면 안 된다 (작년 팀 이름을 올해 다시 쓸 수 있다)
+    private void validateUniqueName(String name, Long contestId, Long excludeTeamId) {
+        if (groupRepository.existsByNameInContest(name, contestId, excludeTeamId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 팀 이름입니다.");
         }
     }

@@ -1,0 +1,33 @@
+# Activate explicitly: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# IDE: set the active profile to local; use the repo root or backend-spring as cwd.
+spring:
+  config:
+    import:
+      - optional:file:./.env.local[.properties]
+      - optional:file:../.env.local[.properties]
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:nimda_local}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:nimda}
+    password: ${MYSQL_PASSWORD:nimda-local-password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: false
+  security:
+    user:
+      name: ${SPRING_SECURITY_USER_NAME:local-system}
+      password: ${SPRING_SECURITY_USER_PASSWORD:local-system-password}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+
+auth:
+  cookie:
+    secure: ${AUTH_COOKIE_SECURE:false}
+    domain: ${AUTH_COOKIE_DOMAIN:}
+
+nimda:
+  file:
+    upload-dir: ${FILE_UPLOAD_DIR:./.local/attachments}

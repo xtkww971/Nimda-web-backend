@@ -43,15 +43,20 @@ public class Group extends BaseTimeEntity {
     @Column(length = 200)
     private String description;
 
+    /** 이 팀이 참가하는 대회(ctf_contests.id). 팀 이름 중복·한 사람 한 팀은 대회 안에서만 따진다. */
+    @Column(name = "contest_id")
+    private Long contestId;
+
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<GroupMember> members = new ArrayList<>();
 
     // 임시
     @Builder
-    private Group(String name, Integer capacity, String description) {
+    private Group(String name, Integer capacity, String description, Long contestId) {
         this.name = name;
         this.capacity = capacity;
         this.description = description;
+        this.contestId = contestId;
     }
 
     /*

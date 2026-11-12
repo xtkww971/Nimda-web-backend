@@ -5,7 +5,7 @@ import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.group.service.CtfTeamResolver;
-import judgeServer.domain.schedule.service.ContestScheduleService;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.instance.Service.CtfServerStatus;
 import judgeServer.domain.instance.Service.InstanceService;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
@@ -42,7 +42,7 @@ public class InstanceController {
     private final InstanceService instanceService;
     private final CtfServerStatus serverStatus;
     private final CtfTeamResolver teamResolver;
-    private final ContestScheduleService scheduleService;
+    private final ContestService contestService;
 
     // 컨테이너 생성 요청
     @PostMapping("/{code}")
@@ -119,7 +119,7 @@ public class InstanceController {
     // 팀전이라 팀이 없는 참가자는 인스턴스를 띄우거나 볼 수 없다 (관리자·DEV 제외).
     private Challenge findChallenge(String code, CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
-        scheduleService.requireChallengesAccessible(user);
+        contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {

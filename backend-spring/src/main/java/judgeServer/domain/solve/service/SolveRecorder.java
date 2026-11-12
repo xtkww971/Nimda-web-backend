@@ -28,7 +28,7 @@ public class SolveRecorder {
 
     /** 팀 단위로 기록한다. 같은 팀원이 이미 맞힌 문제면 ALREADY_SOLVED이고 점수는 다시 주지 않는다. */
     @Transactional
-    public SubmissionVerdict record(Long challengeId, Long userId, Long teamId) {
+    public SubmissionVerdict record(Long challengeId, Long userId, Long teamId, Long contestId) {
         Challenge challenge = challengeRepository.findByIdForUpdate(challengeId).orElse(null);
         if (challenge == null) {
             return SubmissionVerdict.of(SubmissionVerdict.Status.ERROR);
@@ -37,11 +37,12 @@ public class SolveRecorder {
             return SubmissionVerdict.of(SubmissionVerdict.Status.ALREADY_SOLVED);
         }
 
-        int awarded = challenge.currentPoints(solveRepository.countByChallengeId(challengeId));
+        int awarded = challenge.currentPoints(solveRepository.countInContest(challengeId, contestId));
         Solve solve = solveRepository.save(Solve.builder()
                 .challengeId(challengeId)
                 .userId(userId)
                 .teamId(teamId)
+                .contestId(contestId)
                 .awardedPoints(awarded)
                 .build());
         // 같은 트랜잭션에서 팀 점수판에 더한다. 정답 기록이 롤백되면 점수도 같이 롤백된다.

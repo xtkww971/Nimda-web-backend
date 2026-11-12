@@ -1,8 +1,7 @@
 package com.nimda.cite.user.service;
 
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.config.CheckConfig;
 import com.nimda.cite.domain.point.entity.UserBalance;
 import com.nimda.cite.domain.point.repositroy.UserBalanceRepository;
@@ -49,7 +48,7 @@ public class UserService {
         if(userRepository.existsByUserId(registerRequestDTO.getUserId())
         || userRepository.existsByEmail(registerRequestDTO.getEmail())
         || userRepository.existsByNickname(registerRequestDTO.getNickname())){
-            throw new AlreadyExistException(UserErrorCode.USER_ALREADY_EXIST);
+            throw new GlobalNimdaException(ErrorCode.USER_ALREADY_EXIST);
         }
 
         String encodedPassword = passwordEncoder.encode(registerRequestDTO.getPassword());
@@ -90,6 +89,6 @@ public class UserService {
     // 닉네임으로 사용자 조회 (공개 프로필)
     public User getUserByNickname(String nickname) {
         return userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND));
     }
 }
