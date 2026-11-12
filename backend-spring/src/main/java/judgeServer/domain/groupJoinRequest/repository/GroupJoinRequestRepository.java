@@ -30,5 +30,8 @@ public interface GroupJoinRequestRepository extends JpaRepository<GroupJoinReque
             Long groupId, Long userId, JoinRequestStatus status
     );
 
+    // 그룹 삭제 전에 FK(fk_join_request_group)가 걸린 요청을 먼저 지운다
+    void deleteByGroupId(Long groupId);
+
 
 }
