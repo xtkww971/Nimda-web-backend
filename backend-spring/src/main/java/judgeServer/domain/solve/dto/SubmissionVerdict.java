@@ -9,7 +9,9 @@ package judgeServer.domain.solve.dto;
 public record SubmissionVerdict(Status status, int awardedPoints) {
 
     public enum Status {
-        CORRECT, WRONG, ALREADY_SOLVED, NOT_FOUND, UNSUPPORTED, ERROR
+        CORRECT, WRONG, ALREADY_SOLVED, NOT_FOUND, UNSUPPORTED, ERROR,
+        /** 팀에 소속되지 않은 참가자의 제출. 팀전이라 받지 않는다. */
+        NO_TEAM
     }
 
     public static SubmissionVerdict of(Status status) {

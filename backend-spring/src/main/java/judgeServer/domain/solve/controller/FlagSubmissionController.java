@@ -3,6 +3,7 @@ package judgeServer.domain.solve.controller;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.validation.Valid;
+import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import judgeServer.domain.solve.dto.SubmitFlagRequest;
 import judgeServer.domain.solve.service.FlagSubmissionService;
@@ -61,6 +62,9 @@ public class FlagSubmissionController {
         switch (verdict.status()) {
             case NOT_FOUND -> {
                 return ApiResponse.fail("존재하지 않는 문제입니다.").toResponse(HttpStatus.NOT_FOUND);
+            }
+            case NO_TEAM -> {
+                return ApiResponse.fail(CtfTeamResolver.NO_TEAM_MESSAGE).toResponse(HttpStatus.FORBIDDEN);
             }
             case UNSUPPORTED -> {
                 return ApiResponse.fail("DYNAMIC 플래그 제출은 아직 지원하지 않습니다.").toResponse(HttpStatus.BAD_REQUEST);
