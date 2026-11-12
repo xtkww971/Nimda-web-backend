@@ -30,15 +30,16 @@ class SolveRecorderScoreTest {
         LocalDateTime solvedAt = LocalDateTime.of(2026, 11, 12, 10, 0);
         when(challengeRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(challenge));
         when(solveRepository.existsByChallengeIdAndTeamId(1L, 3L)).thenReturn(false);
-        when(solveRepository.countByChallengeId(1L)).thenReturn(2L);
+        when(solveRepository.countInContest(1L, 9L)).thenReturn(2L);
         when(solveRepository.save(any(Solve.class))).thenAnswer(inv -> {
             Solve s = inv.getArgument(0);
             assertEquals(3L, s.getTeamId());
+            assertEquals(9L, s.getContestId());
             return Solve.builder().challengeId(s.getChallengeId()).userId(s.getUserId()).teamId(s.getTeamId())
                     .awardedPoints(s.getAwardedPoints()).solvedAt(solvedAt).build();
         });
 
-        SubmissionVerdict verdict = recorder.record(1L, 7L, 3L);
+        SubmissionVerdict verdict = recorder.record(1L, 7L, 3L, 9L);
 
         assertEquals(SubmissionVerdict.Status.CORRECT, verdict.status());
         assertEquals(80, verdict.awardedPoints());
@@ -51,7 +52,7 @@ class SolveRecorderScoreTest {
         when(solveRepository.existsByChallengeIdAndTeamId(1L, 3L)).thenReturn(true);
 
         // 같은 팀(3)의 다른 멤버(8)가 이미 푼 문제를 다시 맞힌 경우
-        SubmissionVerdict verdict = recorder.record(1L, 8L, 3L);
+        SubmissionVerdict verdict = recorder.record(1L, 8L, 3L, 9L);
 
         assertEquals(SubmissionVerdict.Status.ALREADY_SOLVED, verdict.status());
         verify(teamScoreRepository, never()).addSolve(anyLong(), anyLong(), any());

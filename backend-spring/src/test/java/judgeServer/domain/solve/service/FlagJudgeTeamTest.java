@@ -3,8 +3,8 @@ package judgeServer.domain.solve.service;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.group.service.CtfTeamResolver;
-import judgeServer.domain.schedule.enums.ContestPhase;
-import judgeServer.domain.schedule.service.ContestScheduleService;
+import judgeServer.domain.contest.enums.ContestPhase;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** Java 24에서는 Mockito가 구체 클래스를 mock하지 못해 SolveRecorder·CtfTeamResolver·ContestScheduleService는 하위 클래스로 대신한다. */
+/** Java 24에서는 Mockito가 구체 클래스를 mock하지 못해 SolveRecorder·CtfTeamResolver·ContestService는 하위 클래스로 대신한다. */
 class FlagJudgeTeamTest {
 
     private static final String HASH = "a".repeat(64);
@@ -56,7 +56,7 @@ class FlagJudgeTeamTest {
         SubmissionVerdict verdict = judge(3L, ContestPhase.RUNNING).judge(1L, 7L, false, HASH, NOW);
 
         assertEquals(100, verdict.awardedPoints());
-        assertEquals(List.of(List.of(1L, 7L, 3L)), solveRecorder.calls);
+        assertEquals(List.of(List.of(1L, 7L, 3L, 9L)), solveRecorder.calls);
     }
 
     @Test
@@ -98,19 +98,24 @@ class FlagJudgeTeamTest {
     }
 
     private FlagJudgeService judge(Long teamId, ContestPhase phase) {
-        CtfTeamResolver resolver = new CtfTeamResolver(null) {
+        CtfTeamResolver resolver = new CtfTeamResolver(null, null) {
             @Override
             public Optional<Long> findTeamId(Long userId) {
                 return Optional.ofNullable(teamId);
             }
         };
-        ContestScheduleService schedule = new ContestScheduleService(null, null) {
+        ContestService contest = new ContestService(null, null, null, null, null) {
             @Override
             public ContestPhase phaseAt(LocalDateTime time) {
                 return phase;
             }
+
+            @Override
+            public Optional<Long> currentContestId() {
+                return Optional.of(9L);
+            }
         };
-        return new FlagJudgeService(challengeRepository, solveRecorder, resolver, schedule);
+        return new FlagJudgeService(challengeRepository, solveRecorder, resolver, contest);
     }
 
     private static class RecordingSolveRecorder extends SolveRecorder {
@@ -121,8 +126,8 @@ class FlagJudgeTeamTest {
         }
 
         @Override
-        public SubmissionVerdict record(Long challengeId, Long userId, Long teamId) {
-            calls.add(List.of(challengeId, userId, teamId));
+        public SubmissionVerdict record(Long challengeId, Long userId, Long teamId, Long contestId) {
+            calls.add(List.of(challengeId, userId, teamId, contestId));
             return new SubmissionVerdict(SubmissionVerdict.Status.CORRECT, 100);
         }
     }

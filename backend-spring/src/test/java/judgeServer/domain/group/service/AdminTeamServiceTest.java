@@ -3,6 +3,7 @@ package judgeServer.domain.group.service;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.dto.TeamResponse;
 import judgeServer.domain.group.dto.TeamCreateRequest;
 import judgeServer.domain.group.entity.Group;
@@ -13,15 +14,18 @@ import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
 import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class AdminTeamServiceTest {
@@ -31,15 +35,22 @@ class AdminTeamServiceTest {
     private final GroupJoinRequestRepository joinRequestRepository = mock(GroupJoinRequestRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final CtfTeamScoreRepository teamScoreRepository = mock(CtfTeamScoreRepository.class);
+    // Java 24에서는 Mockito가 구체 클래스를 mock하지 못해 하위 클래스로 현재 대회(id=9)를 고정한다.
+    private final ContestService contestService = new ContestService(null, null, null, null, null) {
+        @Override
+        public Optional<Long> currentContestId() {
+            return Optional.of(9L);
+        }
+    };
     private final AdminTeamService service =
             new AdminTeamService(groupRepository, memberRepository, joinRequestRepository, userRepository,
-                    teamScoreRepository);
+                    teamScoreRepository, contestService);
 
     @Test
     void createTeamIncludesLeaderAndAssignsRoles() {
         List<User> users = List.of(user(1L, "a"), user(2L, "b"));
         when(userRepository.findAllById(anyCollection())).thenReturn(users);
-        when(memberRepository.findByUserIdIn(anyCollection())).thenReturn(List.of());
+        when(memberRepository.findInContestByUserIds(anyCollection(), eq(9L))).thenReturn(List.of());
 
         TeamResponse response = service.createTeam(request("team", 4, 1L, List.of(2L)));
 
@@ -47,7 +58,10 @@ class AdminTeamServiceTest {
         assertEquals(MemberRole.LEADER, response.members().get(0).role());
         assertEquals(1L, response.members().get(0).userId());
         assertEquals(MemberRole.MEMBER, response.members().get(1).role());
-        verify(groupRepository).save(any(Group.class));
+        ArgumentCaptor<Group> saved = ArgumentCaptor.forClass(Group.class);
+        verify(groupRepository).save(saved.capture());
+        // 팀은 현재 대회에 묶인다
+        assertEquals(9L, saved.getValue().getContestId());
         // 팀을 만들 때 팀 점수판 행도 만든다
         verify(teamScoreRepository).initialize(any());
     }
@@ -65,7 +79,7 @@ class AdminTeamServiceTest {
         User a = user(1L, "a");
         when(userRepository.findAllById(anyCollection())).thenReturn(List.of(a));
         Group other = Group.builder().name("other").capacity(4).build();
-        when(memberRepository.findByUserIdIn(anyCollection()))
+        when(memberRepository.findInContestByUserIds(anyCollection(), eq(9L)))
                 .thenReturn(List.of(GroupMember.builder().group(other).user(a).role(MemberRole.MEMBER).build()));
 
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
