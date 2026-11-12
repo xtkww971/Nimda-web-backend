@@ -2,7 +2,7 @@ package redis.mq.consumer;
 
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
-import judgeServer.domain.schedule.service.ContestScheduleService;
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.solve.service.FlagJudgeService;
 import judgeServer.domain.solve.service.FlagSubmissionService;
 import lombok.RequiredArgsConstructor;
@@ -115,12 +115,12 @@ public class FlagSubmissionConsumer
     // 배포 직후 이전 버전이 넣은 메시지에는 제출 시각이 없다. 그때는 지금 시각으로 판정한다.
     private static LocalDateTime parseSubmittedAt(String epochMillis) {
         if (epochMillis == null || epochMillis.isBlank()) {
-            return LocalDateTime.now(ContestScheduleService.KST);
+            return LocalDateTime.now(ContestService.KST);
         }
         try {
-            return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epochMillis)), ContestScheduleService.KST);
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epochMillis)), ContestService.KST);
         } catch (NumberFormatException e) {
-            return LocalDateTime.now(ContestScheduleService.KST);
+            return LocalDateTime.now(ContestService.KST);
         }
     }
 

@@ -1,5 +1,6 @@
 package judgeServer.domain.scoreboard.service;
 
+import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.groupMember.entity.GroupMember;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
@@ -30,13 +31,15 @@ public class ScoreboardService {
     private final SolveRepository solveRepository;
     private final GroupMemberRepository memberRepository;
     private final CtfTeamResolver teamResolver;
+    private final ContestService contestService;
 
-    /** 점수가 있는 팀을 순위 순서대로. 정렬이 유일하므로 순위는 페이지 위치로 정한다. */
+    /** 현재 대회에서 점수가 있는 팀을 순위 순서대로. 정렬이 유일하므로 순위는 페이지 위치로 정한다. */
     public TeamScoreboardPageResponse getScoreboard(int page, int size) {
+        Long contestId = contestService.currentContestId().orElse(null);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
 
-        Page<TeamScoreboardRow> rows = teamScoreRepository.findRanking(PageRequest.of(safePage, safeSize));
+        Page<TeamScoreboardRow> rows = teamScoreRepository.findRanking(contestId, PageRequest.of(safePage, safeSize));
         long firstRank = (long) safePage * safeSize + 1;
 
         List<TeamScoreboardRow> content = rows.getContent();
@@ -45,7 +48,7 @@ public class ScoreboardService {
             entries.add(TeamScoreboardEntryResponse.of(firstRank + i, content.get(i)));
         }
         return new TeamScoreboardPageResponse(entries, safePage, safeSize, rows.getTotalElements(),
-                rows.getTotalPages(), teamScoreRepository.count());
+                rows.getTotalPages(), teamScoreRepository.countInContest(contestId));
     }
 
     /** 내 팀 점수·순위·멤버별 기여·최근 해결. 팀이 없으면 비어 있다. */
@@ -55,6 +58,7 @@ public class ScoreboardService {
             return Optional.empty();
         }
         Long id = teamId.get();
+        Long contestId = contestService.currentContestId().orElse(null);
 
         List<GroupMember> members = memberRepository.findByGroupId(id);
         if (members.isEmpty()) {
@@ -66,7 +70,7 @@ public class ScoreboardService {
         long totalScore = score == null ? 0 : score.getTotalScore();
         int solveCount = score == null ? 0 : score.getSolveCount();
         Long rank = totalScore > 0
-                ? teamScoreRepository.countAhead(id, score.getTotalScore(), score.getLastSolvedAt()) + 1
+                ? teamScoreRepository.countAhead(contestId, id, score.getTotalScore(), score.getLastSolvedAt()) + 1
                 : null;
 
         Map<Long, SolveRepository.MemberContribution> contributions = solveRepository.findContributionsByTeamId(id)
@@ -87,7 +91,7 @@ public class ScoreboardService {
                 .toList();
 
         return Optional.of(new MyTeamScoreResponse(
-                id, teamName, rank, teamScoreRepository.count(), totalScore, solveCount, members.size(),
+                id, teamName, rank, teamScoreRepository.countInContest(contestId), totalScore, solveCount, members.size(),
                 score == null ? null : score.getLastSolvedAt(),
                 memberViews,
                 solveRepository.findRecentByTeamId(id, PageRequest.of(0, RECENT_SOLVES_LIMIT))));

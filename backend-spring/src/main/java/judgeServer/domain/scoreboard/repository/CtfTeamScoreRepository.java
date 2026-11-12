@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 
 /**
- * 순위 정렬 기준: 점수 내림차순 → 마지막 득점 시각 오름차순(먼저 도달한 팀 우선) → team_id 오름차순.
+ * 현재 대회의 팀만 순위에 오른다. 순위 정렬 기준: 점수 내림차순 → 마지막 득점 시각 오름차순(먼저 도달한 팀 우선) → team_id 오름차순.
  * 목록 조회와 내 팀 순위 계산이 같은 기준을 써야 순위가 어긋나지 않는다.
  */
 @Repository
@@ -68,20 +68,26 @@ public interface CtfTeamScoreRepository extends JpaRepository<CtfTeamScore, Long
                 (select count(m) from GroupMember m where m.group.id = ts.teamId),
                 ts.totalScore, ts.solveCount, ts.lastSolvedAt)
             from CtfTeamScore ts join Group g on g.id = ts.teamId
-            where ts.totalScore > 0
+            where ts.totalScore > 0 and (g.contestId = :contestId or (:contestId is null and g.contestId is null))
             order by ts.totalScore desc, ts.lastSolvedAt asc, ts.teamId asc
             """,
-            countQuery = "select count(ts) from CtfTeamScore ts where ts.totalScore > 0")
-    Page<TeamScoreboardRow> findRanking(Pageable pageable);
+            countQuery = "select count(ts) from CtfTeamScore ts join Group g on g.id = ts.teamId where ts.totalScore > 0 and (g.contestId = :contestId or (:contestId is null and g.contestId is null))")
+    Page<TeamScoreboardRow> findRanking(@Param("contestId") Long contestId, Pageable pageable);
 
-    /** 우리 팀보다 위에 있는 팀 수. 순위는 이 값 + 1이다. */
+    /** 대회의 전체 팀 수 ("#4 / 12"의 12). */
+    @Query("select count(ts) from CtfTeamScore ts join Group g on g.id = ts.teamId where (g.contestId = :contestId or (:contestId is null and g.contestId is null))")
+    long countInContest(@Param("contestId") Long contestId);
+
+    /** 같은 대회에서 우리 팀보다 위에 있는 팀 수. 순위는 이 값 + 1이다. */
     @Query("""
-            select count(ts) from CtfTeamScore ts
-            where ts.totalScore > :score
-               or (ts.totalScore = :score and ts.lastSolvedAt < :lastSolvedAt)
-               or (ts.totalScore = :score and ts.lastSolvedAt = :lastSolvedAt and ts.teamId < :teamId)
+            select count(ts) from CtfTeamScore ts join Group g on g.id = ts.teamId
+            where (g.contestId = :contestId or (:contestId is null and g.contestId is null))
+              and (ts.totalScore > :score
+                   or (ts.totalScore = :score and ts.lastSolvedAt < :lastSolvedAt)
+                   or (ts.totalScore = :score and ts.lastSolvedAt = :lastSolvedAt and ts.teamId < :teamId))
             """)
-    long countAhead(@Param("teamId") Long teamId,
+    long countAhead(@Param("contestId") Long contestId,
+                    @Param("teamId") Long teamId,
                     @Param("score") Long score,
                     @Param("lastSolvedAt") LocalDateTime lastSolvedAt);
 }
