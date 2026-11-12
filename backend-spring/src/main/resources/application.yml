@@ -117,6 +117,8 @@ ctf:
   instance:
     base-domain: ${CTF_INSTANCE_BASE_DOMAIN:}
     subdomain-prefix: ${CTF_INSTANCE_SUBDOMAIN_PREFIX:inst-}
+    # CTF 서버 인스턴스 게이트웨이 "사설IP:포트". 비어 있으면 결과 host:port로 직접 붙는다(같은 호스트).
+    gateway: ${CTF_INSTANCE_GATEWAY:}
   # Redis 키 보관 시간 (CtfTtlProperties). 단위 예: 30s, 10m, 1h. result <= owner, mapping 을 지킬 것.
   ttl:
     # 조율자 결과(ctf:result:{uuid})
