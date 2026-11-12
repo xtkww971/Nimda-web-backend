@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Spring Boot (local)",
+      "request": "launch",
+      "mainClass": "com.nimda.cite.NimdaCiteApplication",
+      "cwd": "${workspaceFolder}/backend-spring",
+      "args": "--spring.profiles.active=local",
+      "console": "integratedTerminal",
+      "shortenCommandLine": "auto"
+    }
+  ]
+}
