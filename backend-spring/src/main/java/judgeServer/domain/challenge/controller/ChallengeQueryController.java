@@ -7,6 +7,7 @@ import judgeServer.domain.challenge.dto.ChallengeSummaryResponse;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.group.service.CtfTeamResolver;
+import judgeServer.domain.schedule.service.ContestScheduleService;
 import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -45,11 +46,13 @@ public class ChallengeQueryController {
     private final ChallengeRepository challengeRepository;
     private final SolveRepository solveRepository;
     private final CtfTeamResolver teamResolver;
+    private final ContestScheduleService scheduleService;
 
     /** 문제 목록. 관리자와 DEV는 초안까지 함께 본다. */
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
+        scheduleService.requireChallengesAccessible(user);
         List<Challenge> challenges = canViewDrafts(user)
                 ? challengeRepository.findAllByOrderByIdAsc()
                 : challengeRepository.findByIsPublicTrueOrderByIdAsc();
@@ -69,6 +72,7 @@ public class ChallengeQueryController {
     public ResponseEntity<?> detail(@PathVariable String code,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
+        scheduleService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
 
