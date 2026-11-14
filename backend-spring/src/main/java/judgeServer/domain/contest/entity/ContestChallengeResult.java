@@ -1,5 +1,6 @@
 package judgeServer.domain.contest.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,7 +8,7 @@ import java.time.LocalDateTime;
 
 /** 대회 종료 시점의 문제별 결과 스냅샷 (최대 → 종료 시점 배점, 해결 팀 수, First Blood). */
 @Entity
-@Table(name = "ctf_contest_challenges")
+@Table(name = TableNames.ctfContestChallengesTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)

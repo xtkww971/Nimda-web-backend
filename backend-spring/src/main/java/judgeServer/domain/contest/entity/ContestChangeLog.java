@@ -1,5 +1,6 @@
 package judgeServer.domain.contest.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
  * FREEZE_MINUTES, REOPENED, FINALIZED
  */
 @Entity
-@Table(name = "ctf_contest_change_logs")
+@Table(name = TableNames.ctfContestChangeLogsTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)

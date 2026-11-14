@@ -1,6 +1,7 @@
 package judgeServer.domain.group.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.group.dto.TeamResponse;
 import judgeServer.domain.group.repository.GroupRepository;
@@ -26,14 +27,14 @@ import java.util.Map;
  * <p>프론트가 팀 소속 여부로 "팀에 소속되어 있지 않습니다" 화면을 띄울 때 쓴다.
  */
 @RestController
-@RequestMapping("/api/ctf/teams")
+@RequestMapping(UrlNames.ctfTeamUrl)
 @RequiredArgsConstructor
 public class CtfTeamController {
 
     private final CtfTeamResolver teamResolver;
     private final GroupRepository groupRepository;
 
-    @GetMapping("/me")
+    @GetMapping(UrlNames.getMyTeamUrl)
     @Transactional(readOnly = true)
     public ResponseEntity<?> myTeam(@AuthenticationPrincipal CustomUserDetails user) {
         TeamResponse team = teamResolver.findTeamId(user.getUser().getId())

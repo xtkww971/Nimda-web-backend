@@ -1,5 +1,7 @@
 package judgeServer.domain.contest.service;
 
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.ctf.ContestErrorCode;
 import judgeServer.domain.contest.dto.ContestDetailResponse;
 import judgeServer.domain.contest.dto.ContestListResponse;
 import judgeServer.domain.contest.entity.Contest;
@@ -11,10 +13,8 @@ import judgeServer.domain.contest.repository.ContestResultMemberRepository;
 import judgeServer.domain.contest.repository.ContestResultRepository;
 import judgeServer.domain.group.repository.GroupRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -92,7 +92,7 @@ public class ContestHistoryService {
     public ContestDetailResponse detail(Long contestId, Long userId) {
         Contest c = contestRepository.findById(contestId)
                 .filter(Contest::isFinalized)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "결과가 확정된 대회가 아닙니다."));
+                .orElseThrow(() -> new NotFoundException(ContestErrorCode.CONTEST_RESULT_NOT_FOUND));
 
         List<ContestResult> results = resultRepository.findStandings(contestId);
         List<ContestDetailResponse.Standing> standings = results.stream()

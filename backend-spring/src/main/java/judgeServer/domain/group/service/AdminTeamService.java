@@ -1,5 +1,10 @@
 package judgeServer.domain.group.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.InvalidStateException;
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
@@ -13,10 +18,8 @@ import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
 import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.function.Function;
@@ -79,7 +82,8 @@ public class AdminTeamService {
             memberIds.addAll(request.getMemberUserIds());
         }
         if (memberIds.size() > request.getCapacity()) {
-            throw badRequest("멤버 수(" + memberIds.size() + ")가 최대 인원(" + request.getCapacity() + ")을 넘습니다.");
+            throw new NotAllowFormException(TeamErrorCode.TEAM_MEMBERS_OVER_CAPACITY,
+                    "멤버 수(" + memberIds.size() + ")가 최대 인원(" + request.getCapacity() + ")을 넘습니다.");
         }
 
         Map<Long, User> users = loadAssignableUsers(memberIds, contestId);
@@ -108,7 +112,8 @@ public class AdminTeamService {
         Group team = lockTeam(teamId);
         validateUniqueName(request.getName(), team.getContestId(), teamId);
         if (request.getCapacity() < team.getMembers().size()) {
-            throw badRequest("현재 멤버 수(" + team.getMembers().size() + ")보다 최대 인원을 작게 할 수 없습니다.");
+            throw new NotAllowFormException(TeamErrorCode.TEAM_CAPACITY_BELOW_MEMBERS,
+                    "현재 멤버 수(" + team.getMembers().size() + ")보다 최대 인원을 작게 할 수 없습니다.");
         }
         team.update(request.getName(), request.getCapacity(), request.getDescription());
         return TeamResponse.from(team);
@@ -131,7 +136,8 @@ public class AdminTeamService {
         LinkedHashSet<Long> userIds = new LinkedHashSet<>(request.getUserIds());
         int remaining = team.getCapacity() - team.getMembers().size();
         if (userIds.size() > remaining) {
-            throw badRequest("팀 정원(" + team.getCapacity() + ")을 넘습니다. 남은 자리: " + Math.max(remaining, 0) + "명");
+            throw new InvalidStateException(TeamErrorCode.TEAM_FULL,
+                    "팀 정원(" + team.getCapacity() + ")을 넘습니다. 남은 자리: " + Math.max(remaining, 0) + "명");
         }
 
         Map<Long, User> users = loadAssignableUsers(userIds, team.getContestId());
@@ -146,7 +152,7 @@ public class AdminTeamService {
     public TeamResponse removeMember(Long teamId, Long userId) {
         Group team = lockTeam(teamId);
         if (!team.removeMemberByUserId(userId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 유저는 이 팀의 멤버가 아닙니다.");
+            throw new NotFoundException(TeamErrorCode.TEAM_MEMBER_NOT_FOUND);
         }
         return TeamResponse.from(team);
     }
@@ -157,7 +163,7 @@ public class AdminTeamService {
         GroupMember target = team.getMembers().stream()
                 .filter(m -> m.getUser().getId().equals(request.getUserId()))
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 유저는 이 팀의 멤버가 아닙니다."));
+                .orElseThrow(() -> new NotFoundException(TeamErrorCode.TEAM_MEMBER_NOT_FOUND));
 
         team.getMembers().stream()
                 .filter(m -> m.getRole() == MemberRole.LEADER)
@@ -176,7 +182,8 @@ public class AdminTeamService {
 
         List<Long> missing = userIds.stream().filter(id -> !users.containsKey(id)).toList();
         if (!missing.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 유저입니다: " + missing);
+            throw new NotFoundException(TeamErrorCode.TEAM_USER_NOT_FOUND,
+                    TeamErrorCode.TEAM_USER_NOT_FOUND.getMessage() + " " + missing);
         }
 
         List<String> notApproved = users.values().stream()
@@ -184,7 +191,8 @@ public class AdminTeamService {
                 .map(User::getNickname)
                 .toList();
         if (!notApproved.isEmpty()) {
-            throw badRequest("승인되지 않은 유저는 팀에 넣을 수 없습니다: " + String.join(", ", notApproved));
+            throw new InvalidStateException(TeamErrorCode.TEAM_USER_NOT_APPROVED,
+                    TeamErrorCode.TEAM_USER_NOT_APPROVED.getMessage() + " " + String.join(", ", notApproved));
         }
 
         List<String> alreadyInTeam = memberRepository.findInContestByUserIds(userIds, contestId).stream()
@@ -192,8 +200,8 @@ public class AdminTeamService {
                 .distinct()
                 .toList();
         if (!alreadyInTeam.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "이미 다른 팀에 속한 유저가 있습니다: " + String.join(", ", alreadyInTeam));
+            throw new AlreadyExistException(TeamErrorCode.TEAM_USER_ALREADY_ASSIGNED,
+                    TeamErrorCode.TEAM_USER_ALREADY_ASSIGNED.getMessage() + " " + String.join(", ", alreadyInTeam));
         }
         return users;
     }
@@ -209,15 +217,11 @@ public class AdminTeamService {
     // 팀 이름은 같은 대회 안에서만 겹치면 안 된다 (작년 팀 이름을 올해 다시 쓸 수 있다)
     private void validateUniqueName(String name, Long contestId, Long excludeTeamId) {
         if (groupRepository.existsByNameInContest(name, contestId, excludeTeamId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 팀 이름입니다.");
+            throw new AlreadyExistException(TeamErrorCode.TEAM_NAME_DUPLICATED);
         }
     }
 
-    private ResponseStatusException teamNotFound() {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 팀입니다.");
-    }
-
-    private ResponseStatusException badRequest(String message) {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    private NotFoundException teamNotFound() {
+        return new NotFoundException(TeamErrorCode.TEAM_NOT_FOUND);
     }
 }

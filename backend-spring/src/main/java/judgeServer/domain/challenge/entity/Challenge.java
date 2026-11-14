@@ -1,5 +1,6 @@
 package judgeServer.domain.challenge.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.enums.FlagType;
@@ -9,7 +10,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "challenges")
+@Table(name = TableNames.challengesTable)
 @Builder
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Challenge {

@@ -1,11 +1,12 @@
 package judgeServer.domain.contest.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
 /** 대회 종료 시점의 팀 멤버와 멤버별 기여 스냅샷. */
 @Entity
-@Table(name = "ctf_contest_result_members")
+@Table(name = TableNames.ctfContestResultMembersTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)

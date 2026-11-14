@@ -1,8 +1,11 @@
 package judgeServer.domain.group.service;
 
+import com.nimda.cite.common.exception.AlreadyExistException;
+import com.nimda.cite.common.exception.NotFoundException;
+import com.nimda.cite.common.exception.errorcode.ctf.GroupErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
 import judgeServer.domain.group.dto.GroupCreateRequest;
 import judgeServer.domain.group.dto.GroupDetailResponse;
 import judgeServer.domain.group.dto.GroupListResponse;
@@ -11,7 +14,7 @@ import judgeServer.domain.group.entity.Group;
 import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.service.GroupMemberService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,20 +22,18 @@ import java.util.List;
 
 
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GroupService {
 
-    @Autowired
-    private GroupRepository groupRepository;
+    private final GroupRepository groupRepository;
 
     // @Autowired
     // private ActivityRepository activityRepository;
 
-    @Autowired
-    private GroupMemberService groupMemberService;
+    private final GroupMemberService groupMemberService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
 
     @Transactional
@@ -56,7 +57,7 @@ public class GroupService {
     @Transactional
     public void updateGroup(Long groupId, Long userId, GroupUpdateRequest request) {
         Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+                .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
         validateLeader(groupId, userId);
         validateUniqueName(request.getName(), groupId);
 
@@ -66,7 +67,7 @@ public class GroupService {
     @Transactional
     public void deleteGroup(Long groupId, Long userId) {
         Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+                .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
         validateLeader(groupId, userId);
 
         groupRepository.delete(group); // cascade로 GroupMember 함께 삭제
@@ -74,7 +75,7 @@ public class GroupService {
 
     public GroupDetailResponse getGroup(Long groupId) {
         Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+                .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
         return GroupDetailResponse.from(group);
     }
 
@@ -92,7 +93,7 @@ public class GroupService {
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
     }
 
     private void validateLeader(Long groupId, Long userId) {
@@ -105,7 +106,7 @@ public class GroupService {
                 ? groupRepository.existsByName(name)
                 : groupRepository.existsByNameAndIdNot(name, excludeGroupId);
         if (duplicated) {
-            throw new IllegalStateException("이미 사용 중인 그룹 이름입니다.");
+            throw new AlreadyExistException(GroupErrorCode.GROUP_NAME_DUPLICATED);
         }
     }
 

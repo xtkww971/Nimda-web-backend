@@ -1,6 +1,7 @@
 package judgeServer.domain.scoreboard.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.scoreboard.service.ScoreboardService;
 import lombok.RequiredArgsConstructor;
@@ -25,19 +26,19 @@ import java.util.Map;
  * <p>순위: 점수 내림차순, 동점이면 마지막 득점이 이른 팀이 위. 점수가 0인 팀은 순위에 나오지 않는다.
  */
 @RestController
-@RequestMapping("/api/ctf/scoreboard")
+@RequestMapping(UrlNames.scoreboardUrl)
 @RequiredArgsConstructor
 public class ScoreboardController {
 
     private final ScoreboardService scoreboardService;
 
-    @GetMapping
+    @GetMapping(UrlNames.getScoreboardUrl)
     public ResponseEntity<?> scoreboard(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return ApiResponse.ok(scoreboardService.getScoreboard(page, size)).toResponse();
     }
 
-    @GetMapping("/me")
+    @GetMapping(UrlNames.getMyTeamScoreUrl)
     public ResponseEntity<?> myTeam(@AuthenticationPrincipal CustomUserDetails user) {
         // Map.of는 null 값을 허용하지 않아 HashMap을 쓴다.
         Map<String, Object> body = new HashMap<>();

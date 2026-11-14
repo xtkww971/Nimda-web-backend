@@ -1,6 +1,7 @@
 package judgeServer.domain.group.entity;
 
 import com.nimda.cite.common.entity.BaseTimeEntity;
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import judgeServer.domain.groupMember.entity.GroupMember;
 import lombok.*;
@@ -11,7 +12,7 @@ import java.util.List;
 
 @Getter
 @Entity
-@Table(name = "`groups`")
+@Table(name = TableNames.groupsTable)
 /*
 , uniqueConstraints = {
         @UniqueConstraint(name = "uk_group_activity_name", columnNames = {"activity_id", "name"})

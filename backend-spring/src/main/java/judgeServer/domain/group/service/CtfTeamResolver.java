@@ -1,13 +1,15 @@
 package judgeServer.domain.group.service;
 
+import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
+import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,8 +22,6 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 public class CtfTeamResolver {
-
-    public static final String NO_TEAM_MESSAGE = "팀에 소속되어 있지 않습니다. 운영진이 팀을 배정하면 문제가 공개됩니다.";
 
     private final GroupMemberRepository memberRepository;
     private final ContestService contestService;
@@ -36,13 +36,13 @@ public class CtfTeamResolver {
     /** 팀이 없는 일반 참가자면 403. 관리자·DEV는 통과. */
     public void requireTeamOrStaff(CustomUserDetails user) {
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
         }
         if (isStaff(user)) {
             return;
         }
         if (findTeamId(user.getUser().getId()).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, NO_TEAM_MESSAGE);
+            throw new NotIncludeRoleException(TeamErrorCode.NO_TEAM);
         }
     }
 

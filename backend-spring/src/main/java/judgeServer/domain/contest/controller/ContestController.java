@@ -1,6 +1,7 @@
 package judgeServer.domain.contest.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.contest.service.ContestHistoryService;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +20,13 @@ import org.springframework.web.bind.annotation.*;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/ctf/contests")
+@RequestMapping(UrlNames.contestUrl)
 @RequiredArgsConstructor
 public class ContestController {
 
     private final ContestHistoryService historyService;
 
-    @GetMapping
+    @GetMapping(UrlNames.getContestsUrl)
     public ResponseEntity<?> list(@RequestParam(defaultValue = "false") boolean participated,
                                   @RequestParam(defaultValue = "latest") String sort,
                                   @AuthenticationPrincipal CustomUserDetails user) {
@@ -33,7 +34,7 @@ public class ContestController {
                 .toResponse();
     }
 
-    @GetMapping("/{contestId}")
+    @GetMapping(UrlNames.getContestDetailUrl)
     public ResponseEntity<?> detail(@PathVariable Long contestId,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         return ApiResponse.ok(historyService.detail(contestId, user.getUser().getId())).toResponse();

@@ -1,5 +1,6 @@
 package judgeServer.domain.scoreboard.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
  * 같은 팀의 정답이 여러 대에서 동시에 처리돼도 점수가 덮어써지지 않게 하기 위함이다.
  */
 @Entity
-@Table(name = "ctf_team_scores")
+@Table(name = TableNames.ctfTeamScoresTable)
 @Getter @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CtfTeamScore {
 

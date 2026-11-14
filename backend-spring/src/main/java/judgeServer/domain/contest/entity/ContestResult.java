@@ -1,5 +1,6 @@
 package judgeServer.domain.contest.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,7 +8,7 @@ import java.time.LocalDateTime;
 
 /** 대회 종료 시점의 팀 최종 순위 스냅샷. 점수가 0인 팀은 teamRank가 null이다. */
 @Entity
-@Table(name = "ctf_contest_results")
+@Table(name = TableNames.ctfContestResultsTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)

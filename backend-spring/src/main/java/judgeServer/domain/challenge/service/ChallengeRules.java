@@ -1,10 +1,10 @@
 package judgeServer.domain.challenge.service;
 
+import com.nimda.cite.common.exception.NotAllowFormException;
+import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
 import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.enums.FlagType;
 import judgeServer.domain.challenge.enums.IsolationType;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 문제 유형(category)·격리 방식(isolationType)·플래그 방식(flagType)의 허용 조합.
@@ -29,7 +29,7 @@ public final class ChallengeRules {
     public static void validate(ChallengeCategory category, IsolationType isolation, FlagType flagType) {
         String reason = reason(category, isolation, flagType);
         if (reason != null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, reason);
+            throw new NotAllowFormException(ChallengeErrorCode.INVALID_CHALLENGE_RULE, reason);
         }
     }
 
