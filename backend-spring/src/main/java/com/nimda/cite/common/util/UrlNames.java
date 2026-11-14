@@ -190,6 +190,7 @@ public class UrlNames {
     public static final String getMembersUrl = "";
     public static final String leaveGroupUrl = "/me";
     public static final String kickMemberUrl = "/{targetUserId}";
+    public static final String transferLeadershipUrl = "/{targetUserId}/leader";
 
     //ProblemController
     public static final String problemUrl = "api/judge/problem";
@@ -210,4 +211,74 @@ public class UrlNames {
     public static final String viewMySourceCodeUrl = "/detail/{submissionId}";
     public static final String viewMyStatusUrl = "/my/status";
     public static final String viewOtherStatusUrl = "/{userId}/status";
+
+    //ChallengeController (CTF)
+    public static final String challengeUrl = "/api/ctf/challenge";
+    public static final String createChallengeUrl = "";
+    public static final String toggleChallengePublicUrl = "/toggle-public/{id}";
+    public static final String deleteChallengeUrl = "/{id}";
+
+    //ChallengeQueryController (CTF)
+    public static final String challengesUrl = "/api/ctf/challenges";
+    public static final String getChallengesUrl = "";
+    public static final String getChallengeDetailUrl = "/{code}";
+
+    //ChallengeDownloadController (CTF)
+    public static final String requestChallengeDownloadUrl = "/{code}/download";
+    public static final String getChallengeDownloadStatusUrl = "/download/{requestId}";
+
+    //FlagSubmissionController (CTF)
+    public static final String submitFlagUrl = "/{challengeId}";
+    public static final String getSubmissionResultUrl = "/submission/{submissionId}";
+
+    //AdminContestController (CTF)
+    public static final String adminContestUrl = "/api/admin/ctf/contests";
+    public static final String getAdminContestsUrl = "";
+    public static final String createContestUrl = "";
+    public static final String finalizeContestUrl = "/{contestId}/finalize";
+
+    //AdminScheduleController (CTF)
+    public static final String adminScheduleUrl = "/api/admin/ctf/schedule";
+    public static final String getAdminScheduleUrl = "";
+    public static final String updateScheduleUrl = "";
+
+    //ContestController (CTF)
+    public static final String contestUrl = "/api/ctf/contests";
+    public static final String getContestsUrl = "";
+    public static final String getContestDetailUrl = "/{contestId}";
+
+    //ScheduleController (CTF)
+    public static final String scheduleUrl = "/api/ctf/schedule";
+    public static final String getScheduleUrl = "";
+
+    //AdminTeamController (CTF)
+    public static final String adminTeamUrl = "/api/admin/ctf/teams";
+    public static final String getTeamsUrl = "";
+    public static final String getUnassignedUsersUrl = "/unassigned";
+    public static final String getTeamUrl = "/{teamId}";
+    public static final String createTeamUrl = "";
+    public static final String updateTeamUrl = "/{teamId}";
+    public static final String deleteTeamUrl = "/{teamId}";
+    public static final String addTeamMembersUrl = "/{teamId}/members";
+    public static final String removeTeamMemberUrl = "/{teamId}/members/{userId}";
+    public static final String changeTeamLeaderUrl = "/{teamId}/leader";
+
+    //CtfTeamController (CTF)
+    public static final String ctfTeamUrl = "/api/ctf/teams";
+    public static final String getMyTeamUrl = "/me";
+
+    //CtfServerStatusController (CTF)
+    public static final String ctfServerStatusUrl = "/api/ctf/server-status";
+    public static final String getCtfServerStatusUrl = "";
+
+    //InstanceController (CTF)
+    public static final String instanceUrl = "/api/ctf/instance";
+    public static final String createInstanceUrl = "/{code}";
+    public static final String getMyInstanceUrl = "/{code}";
+    public static final String getInstanceStatusUrl = "/status/{uuid}";
+
+    //ScoreboardController (CTF)
+    public static final String scoreboardUrl = "/api/ctf/scoreboard";
+    public static final String getScoreboardUrl = "";
+    public static final String getMyTeamScoreUrl = "/me";
 }

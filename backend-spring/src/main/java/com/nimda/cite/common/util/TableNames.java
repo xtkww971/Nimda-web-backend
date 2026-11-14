@@ -49,4 +49,20 @@ public class TableNames {
 
     //judgeServer - submission
     public static final String submissionsTable = "submissions";
+
+    //judgeServer - challenge
+    public static final String challengesTable = "challenges";
+
+    //judgeServer - contest
+    public static final String ctfContestsTable = "ctf_contests";
+    public static final String ctfContestChallengesTable = "ctf_contest_challenges";
+    public static final String ctfContestChangeLogsTable = "ctf_contest_change_logs";
+    public static final String ctfContestResultsTable = "ctf_contest_results";
+    public static final String ctfContestResultMembersTable = "ctf_contest_result_members";
+
+    //judgeServer - scoreboard
+    public static final String ctfTeamScoresTable = "ctf_team_scores";
+
+    //judgeServer - solve
+    public static final String solvesTable = "solves";
 }
