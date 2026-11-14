@@ -1,10 +1,12 @@
-package judgeServer.domain.instance.Contoller;
+package judgeServer.domain.instance.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
-import judgeServer.domain.instance.Service.CtfServerStatus;
+import com.nimda.cite.common.util.UrlNames;
+import judgeServer.domain.instance.service.CtfServerStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -17,12 +19,13 @@ import java.util.Map;
  * 로그인 여부는 SecurityConfig의 기본 규칙(authenticated)을 따른다.
  */
 @RestController
+@RequestMapping(UrlNames.ctfServerStatusUrl)
 @RequiredArgsConstructor
 public class CtfServerStatusController {
 
     private final CtfServerStatus serverStatus;
 
-    @GetMapping("/api/ctf/server-status")
+    @GetMapping(UrlNames.getCtfServerStatusUrl)
     public ResponseEntity<?> status() {
         return ApiResponse.ok(Map.of("available", serverStatus.isAvailable())).toResponse();
     }

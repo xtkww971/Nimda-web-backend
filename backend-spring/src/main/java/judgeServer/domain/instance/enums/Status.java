@@ -1,4 +1,4 @@
-package judgeServer.domain.instance.ObjectStatus;
+package judgeServer.domain.instance.enums;
 
 // 요청에 대한 인스턴스 상태
 public enum Status {

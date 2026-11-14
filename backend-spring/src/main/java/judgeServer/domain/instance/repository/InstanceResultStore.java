@@ -1,4 +1,4 @@
-package judgeServer.domain.instance.Repository;
+package judgeServer.domain.instance.repository;
 
 import redis.mq.consumer.CtfResultConsumer;
 import redis.mq.message.CtfResultMessage;

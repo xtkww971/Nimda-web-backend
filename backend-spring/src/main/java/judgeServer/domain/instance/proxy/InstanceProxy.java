@@ -1,4 +1,4 @@
-package judgeServer.domain.instance.Proxy;
+package judgeServer.domain.instance.proxy;
 
 import judgeServer.config.InstanceProperties;
 import lombok.RequiredArgsConstructor;
