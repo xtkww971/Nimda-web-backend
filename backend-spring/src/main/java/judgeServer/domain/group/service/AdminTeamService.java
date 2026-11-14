@@ -11,6 +11,7 @@ import com.nimda.cite.user.repository.UserRepository;
 import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.dto.*;
 import judgeServer.domain.group.entity.Group;
+import judgeServer.domain.group.enums.GroupType;
 import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupJoinRequest.repository.GroupJoinRequestRepository;
 import judgeServer.domain.groupMember.entity.GroupMember;
@@ -57,7 +58,7 @@ public class AdminTeamService {
     }
 
     public TeamResponse getTeam(Long teamId) {
-        return TeamResponse.from(groupRepository.findByIdWithMembers(teamId).orElseThrow(this::teamNotFound));
+        return TeamResponse.from(groupRepository.findByIdWithMembers(teamId).filter(Group::isCtfTeam).orElseThrow(this::teamNotFound));
     }
 
     /** 현재 대회에서 아직 팀이 없는 승인된 참가자. keyword는 닉네임·아이디 부분 일치. */
@@ -93,6 +94,7 @@ public class AdminTeamService {
                 .capacity(request.getCapacity())
                 .description(request.getDescription())
                 .contestId(contestId)
+                .type(GroupType.CTF_TEAM)
                 .build();
         for (Long userId : memberIds) {
             team.addMember(GroupMember.builder()
@@ -206,8 +208,9 @@ public class AdminTeamService {
         return users;
     }
 
+    // 스터디 그룹도 groups 테이블에 있다. 팀 API로는 스터디 그룹을 건드리지 못하게 없는 팀으로 본다.
     private Group lockTeam(Long teamId) {
-        return groupRepository.findByIdForUpdate(teamId).orElseThrow(this::teamNotFound);
+        return groupRepository.findByIdForUpdate(teamId).filter(Group::isCtfTeam).orElseThrow(this::teamNotFound);
     }
 
     private Long currentContestId() {

@@ -44,10 +44,10 @@ public class GroupJoinRequestService {
 
     @Transactional
     public Long applyToGroup(Long groupId, Long userId) {
+        Group group = getGroup(groupId);
         validateNotAlreadyMember(groupId, userId);
         validateNoPendingRequest(groupId, userId);
 
-        Group group = getGroup(groupId);
         User user = getUser(userId);
 
         GroupJoinRequest request = GroupJoinRequest.builder()
@@ -63,11 +63,11 @@ public class GroupJoinRequestService {
     // 그룹장이 특정 사용자를 초대
     @Transactional
     public Long inviteToGroup(Long groupId, Long inviterId, Long inviteeId) {
+        Group group = getGroup(groupId);
         validateLeader(groupId, inviterId);
         validateNotAlreadyMember(groupId, inviteeId);
         validateNoPendingRequest(groupId, inviteeId);
 
-        Group group = getGroup(groupId);
         User invitee = getUser(inviteeId);
 
         GroupJoinRequest request = GroupJoinRequest.builder()
@@ -89,6 +89,7 @@ public class GroupJoinRequestService {
 
         // 정원 확인 시 락을 사용해 동시성 문제를 방지하게 설정
         Group group = groupRepository.findByIdForUpdate(request.getGroup().getId())
+                .filter(Group::isStudy)
                 .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
         validateCapacity(group);
 
@@ -121,6 +122,7 @@ public class GroupJoinRequestService {
 
     // 그룹장만 대기 중인 신청/초대 목록을 볼 수 있음
     public List<GroupJoinRequestResponse> getPendingRequestsOfGroup(Long groupId, Long requesterId) {
+        getGroup(groupId);
         validateLeader(groupId, requesterId);
 
         return joinRequestRepository.findByGroupIdAndStatus(groupId, JoinRequestStatus.PENDING)
@@ -178,8 +180,10 @@ public class GroupJoinRequestService {
         groupMemberService.validateLeader(groupId, userId);
     }
 
+    // CTF 팀은 가입 신청·초대로 멤버를 바꾸지 않는다 (운영자 팀 빌딩만).
     private Group getGroup(Long groupId) {
         return groupRepository.findById(groupId)
+                .filter(Group::isStudy)
                 .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
     }
 

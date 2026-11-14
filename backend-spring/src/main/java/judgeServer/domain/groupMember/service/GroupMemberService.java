@@ -7,6 +7,7 @@ import com.nimda.cite.common.exception.NotIncludeRoleException;
 import com.nimda.cite.common.exception.errorcode.ctf.GroupErrorCode;
 import com.nimda.cite.user.entity.User;
 import judgeServer.domain.group.entity.Group;
+import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupMember.dto.GroupMemberResponse;
 import judgeServer.domain.groupMember.entity.GroupMember;
 import judgeServer.domain.groupMember.enums.MemberRole;
@@ -23,8 +24,10 @@ import java.util.List;
 public class GroupMemberService {
 
     private final GroupMemberRepository memberRepository;
+    private final GroupRepository groupRepository;
 
     public List<GroupMemberResponse> getMembers(Long groupId) {
+        requireStudyGroup(groupId);
         return memberRepository.findByGroupId(groupId).stream()
                 .map(GroupMemberResponse::from)
                 .toList();
@@ -81,8 +84,17 @@ public class GroupMemberService {
         memberRepository.delete(target);
     }
 
+    // CTF 팀도 groups 테이블에 있다. 팀 멤버는 운영자 팀 빌딩으로만 바꾸므로,
+    // 스터디 그룹 API(탈퇴·강퇴·위임·그룹장 확인)에서는 CTF 팀 멤버를 없는 것으로 본다.
+    private void requireStudyGroup(Long groupId) {
+        if (!groupRepository.findById(groupId).map(Group::isStudy).orElse(false)) {
+            throw new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND);
+        }
+    }
+
     private GroupMember getMember(Long groupId, Long userId) {
         return memberRepository.findByGroupIdAndUserId(groupId, userId)
+                .filter(member -> member.getGroup().isStudy())
                 .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_MEMBER_NOT_FOUND));
     }
 
