@@ -1,7 +1,7 @@
 package judgeServer.domain.challenge.controller;
 
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
@@ -75,10 +75,10 @@ public class ChallengeQueryController {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canViewDrafts(user)) {
-            throw new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         return ApiResponse.ok(ChallengeDetailResponse.from(challenge,
                 solveRepository.countInContest(challenge.getId(), contestService.currentContestId().orElse(null)))).toResponse();

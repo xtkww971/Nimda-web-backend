@@ -1,9 +1,8 @@
 package com.nimda.cite.domain.tag.service;
 
 
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.CategoryErrorCode;
-import com.nimda.cite.common.exception.errorcode.domain.TagErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.board.entity.Category;
 import com.nimda.cite.domain.board.repository.CategoryRepository;
 import com.nimda.cite.domain.tag.entity.Tag;
@@ -31,7 +30,7 @@ public class TagService {
     @Transactional
     public Tag addTag(String name, Integer value, Long categoryId) {
         Category category = categoryRepository.findById(categoryId).orElseThrow(
-                () -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND)
         );
 
         Tag tag = Tag.builder().tagName(name)
@@ -52,7 +51,7 @@ public class TagService {
     @Transactional
     public void deleteTag(Long tagId) {
         Tag tag = tagRepository.findById(tagId).orElseThrow(
-                () -> new NotFoundException(TagErrorCode.TAG_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.TAG_NOT_FOUND)
         );
 
         tagRepository.deleteById(tagId);
@@ -61,7 +60,7 @@ public class TagService {
     @Transactional
     public Tag tagUpdate(Long tagId, String name, Integer sortValue, Long categoryId) {
         Tag tag = tagRepository.findById(tagId).orElseThrow(
-                () -> new NotFoundException(TagErrorCode.TAG_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.TAG_NOT_FOUND)
         );
 
         if (name != null && !name.isBlank()) tag.setTagName(name);
@@ -73,7 +72,7 @@ public class TagService {
             // 2. 있는데 가져온 ID와 다를 때만 실행
             if (tag.getCategory() == null || !tag.getCategory().getId().equals(categoryId)) {
                 Category category = categoryRepository.findById(categoryId).orElseThrow(
-                        () -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND)
+                        () -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND)
                 );
                 tag.setCategory(category);
             }

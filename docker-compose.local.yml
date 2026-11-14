@@ -1,0 +1,57 @@
+name: nimda-local
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      # Use Spring's DB password for root. Do not pass MYSQL_USER=root to the image.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-nimda-local-password}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nimda_local}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./local/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql -h 127.0.0.1 -u root "$${MYSQL_DATABASE}" -e "SELECT COUNT(*) FROM user_authority" >/dev/null']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:7.0-alpine
+    command: [redis-server, --appendonly, 'yes']
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.34.1
+    ports:
+      - "127.0.0.1:${NIMDA_API_DOCS_PORT:-18080}:8080"
+    volumes:
+      - ./docs/api/openapi.yaml:/docs/openapi.yaml:ro
+    environment:
+      SWAGGER_JSON: /docs/openapi.yaml
+      SUPPORTED_SUBMIT_METHODS: '[]'
+      VALIDATOR_URL: none
+      QUERY_CONFIG_ENABLED: 'false'
+      PERSIST_AUTHORIZATION: 'false'
+      WITH_CREDENTIALS: 'false'
+      DISPLAY_OPERATION_ID: 'true'
+      DOC_EXPANSION: none
+      TAGS_SORTER: alpha
+    restart: "no"
+
+volumes:
+  mysql_data:
+  redis_data:

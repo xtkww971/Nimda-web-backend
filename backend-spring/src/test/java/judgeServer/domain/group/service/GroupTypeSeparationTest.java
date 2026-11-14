@@ -1,8 +1,7 @@
 package judgeServer.domain.group.service;
 
 import com.nimda.cite.common.exception.GlobalNimdaException;
-import com.nimda.cite.common.exception.errorcode.ctf.GroupErrorCode;
-import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
 import judgeServer.domain.contest.service.ContestService;
@@ -69,10 +68,10 @@ class GroupTypeSeparationTest {
         when(groupRepository.findById(5L)).thenReturn(Optional.of(group(5L, GroupType.CTF_TEAM)));
 
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class, () -> groupService.getGroup(5L));
-        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, e.getErrorCode());
+        assertEquals(ErrorCode.GROUP_NOT_FOUND, e.getErrorCode());
         GlobalNimdaException members = assertThrows(GlobalNimdaException.class,
                 () -> memberService.getMembers(5L));
-        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, members.getErrorCode());
+        assertEquals(ErrorCode.GROUP_NOT_FOUND, members.getErrorCode());
         verify(groupRepository, never()).delete(any());
     }
 
@@ -82,9 +81,9 @@ class GroupTypeSeparationTest {
         when(groupRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(group(7L, GroupType.STUDY)));
 
         GlobalNimdaException get = assertThrows(GlobalNimdaException.class, () -> teamService.getTeam(7L));
-        assertEquals(TeamErrorCode.TEAM_NOT_FOUND, get.getErrorCode());
+        assertEquals(ErrorCode.TEAM_NOT_FOUND, get.getErrorCode());
         GlobalNimdaException delete = assertThrows(GlobalNimdaException.class, () -> teamService.deleteTeam(7L));
-        assertEquals(TeamErrorCode.TEAM_NOT_FOUND, delete.getErrorCode());
+        assertEquals(ErrorCode.TEAM_NOT_FOUND, delete.getErrorCode());
         verify(groupRepository, never()).delete(any());
     }
 

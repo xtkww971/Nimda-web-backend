@@ -1,8 +1,8 @@
 package com.nimda.cite.user.entity;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.util.TableNames;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.user.AdminUserErrorCode;
 import com.nimda.cite.config.CheckConfig;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -178,7 +178,7 @@ public class User extends BaseTimeEntity {
         boolean removed =  this.authorities
                 .removeIf(a -> a.getAuthorityName().equals(authority.getAuthorityName()));
         if(!removed){
-            throw new NotFoundException(AdminUserErrorCode.AUTHORITY_NOT_EXIST);
+            throw new GlobalNimdaException(ErrorCode.AUTHORITY_NOT_EXIST);
         }
     }
 }

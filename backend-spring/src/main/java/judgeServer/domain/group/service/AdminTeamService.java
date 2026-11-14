@@ -1,10 +1,7 @@
 package judgeServer.domain.group.service;
 
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
@@ -83,7 +80,7 @@ public class AdminTeamService {
             memberIds.addAll(request.getMemberUserIds());
         }
         if (memberIds.size() > request.getCapacity()) {
-            throw new NotAllowFormException(TeamErrorCode.TEAM_MEMBERS_OVER_CAPACITY,
+            throw new GlobalNimdaException(ErrorCode.TEAM_MEMBERS_OVER_CAPACITY,
                     "멤버 수(" + memberIds.size() + ")가 최대 인원(" + request.getCapacity() + ")을 넘습니다.");
         }
 
@@ -114,7 +111,7 @@ public class AdminTeamService {
         Group team = lockTeam(teamId);
         validateUniqueName(request.getName(), team.getContestId(), teamId);
         if (request.getCapacity() < team.getMembers().size()) {
-            throw new NotAllowFormException(TeamErrorCode.TEAM_CAPACITY_BELOW_MEMBERS,
+            throw new GlobalNimdaException(ErrorCode.TEAM_CAPACITY_BELOW_MEMBERS,
                     "현재 멤버 수(" + team.getMembers().size() + ")보다 최대 인원을 작게 할 수 없습니다.");
         }
         team.update(request.getName(), request.getCapacity(), request.getDescription());
@@ -138,7 +135,7 @@ public class AdminTeamService {
         LinkedHashSet<Long> userIds = new LinkedHashSet<>(request.getUserIds());
         int remaining = team.getCapacity() - team.getMembers().size();
         if (userIds.size() > remaining) {
-            throw new InvalidStateException(TeamErrorCode.TEAM_FULL,
+            throw new GlobalNimdaException(ErrorCode.TEAM_FULL,
                     "팀 정원(" + team.getCapacity() + ")을 넘습니다. 남은 자리: " + Math.max(remaining, 0) + "명");
         }
 
@@ -154,7 +151,7 @@ public class AdminTeamService {
     public TeamResponse removeMember(Long teamId, Long userId) {
         Group team = lockTeam(teamId);
         if (!team.removeMemberByUserId(userId)) {
-            throw new NotFoundException(TeamErrorCode.TEAM_MEMBER_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.TEAM_MEMBER_NOT_FOUND);
         }
         return TeamResponse.from(team);
     }
@@ -165,7 +162,7 @@ public class AdminTeamService {
         GroupMember target = team.getMembers().stream()
                 .filter(m -> m.getUser().getId().equals(request.getUserId()))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException(TeamErrorCode.TEAM_MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.TEAM_MEMBER_NOT_FOUND));
 
         team.getMembers().stream()
                 .filter(m -> m.getRole() == MemberRole.LEADER)
@@ -184,8 +181,8 @@ public class AdminTeamService {
 
         List<Long> missing = userIds.stream().filter(id -> !users.containsKey(id)).toList();
         if (!missing.isEmpty()) {
-            throw new NotFoundException(TeamErrorCode.TEAM_USER_NOT_FOUND,
-                    TeamErrorCode.TEAM_USER_NOT_FOUND.getMessage() + " " + missing);
+            throw new GlobalNimdaException(ErrorCode.TEAM_USER_NOT_FOUND,
+                    ErrorCode.TEAM_USER_NOT_FOUND.getMessage() + " " + missing);
         }
 
         List<String> notApproved = users.values().stream()
@@ -193,8 +190,8 @@ public class AdminTeamService {
                 .map(User::getNickname)
                 .toList();
         if (!notApproved.isEmpty()) {
-            throw new InvalidStateException(TeamErrorCode.TEAM_USER_NOT_APPROVED,
-                    TeamErrorCode.TEAM_USER_NOT_APPROVED.getMessage() + " " + String.join(", ", notApproved));
+            throw new GlobalNimdaException(ErrorCode.TEAM_USER_NOT_APPROVED,
+                    ErrorCode.TEAM_USER_NOT_APPROVED.getMessage() + " " + String.join(", ", notApproved));
         }
 
         List<String> alreadyInTeam = memberRepository.findInContestByUserIds(userIds, contestId).stream()
@@ -202,8 +199,8 @@ public class AdminTeamService {
                 .distinct()
                 .toList();
         if (!alreadyInTeam.isEmpty()) {
-            throw new AlreadyExistException(TeamErrorCode.TEAM_USER_ALREADY_ASSIGNED,
-                    TeamErrorCode.TEAM_USER_ALREADY_ASSIGNED.getMessage() + " " + String.join(", ", alreadyInTeam));
+            throw new GlobalNimdaException(ErrorCode.TEAM_USER_ALREADY_ASSIGNED,
+                    ErrorCode.TEAM_USER_ALREADY_ASSIGNED.getMessage() + " " + String.join(", ", alreadyInTeam));
         }
         return users;
     }
@@ -220,11 +217,11 @@ public class AdminTeamService {
     // 팀 이름은 같은 대회 안에서만 겹치면 안 된다 (작년 팀 이름을 올해 다시 쓸 수 있다)
     private void validateUniqueName(String name, Long contestId, Long excludeTeamId) {
         if (groupRepository.existsByNameInContest(name, contestId, excludeTeamId)) {
-            throw new AlreadyExistException(TeamErrorCode.TEAM_NAME_DUPLICATED);
+            throw new GlobalNimdaException(ErrorCode.TEAM_NAME_DUPLICATED);
         }
     }
 
-    private NotFoundException teamNotFound() {
-        return new NotFoundException(TeamErrorCode.TEAM_NOT_FOUND);
+    private GlobalNimdaException teamNotFound() {
+        return new GlobalNimdaException(ErrorCode.TEAM_NOT_FOUND);
     }
 }

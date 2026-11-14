@@ -1,8 +1,7 @@
 package com.nimda.cite.domain.point.service;
 
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.PointErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.point.dto.ManualBalanceUpdateRequest;
 import com.nimda.cite.domain.point.entity.PointDetail;
 import com.nimda.cite.domain.point.entity.UserBalance;
@@ -41,7 +40,7 @@ public class PointService {
         Optional<UserBalance> balance = userBalanceRepository.findById(userId);
 
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
 
         Optional<UserBalance> userBalance = userBalanceRepository.findById(userId);
@@ -60,10 +59,10 @@ public class PointService {
     public UserBalance updateBalanceAuto(Long userId, PointTypes type) {
         // 최초 출석 시 계좌가 존재하지 않기 때문에 생성해야 함
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
         UserBalance balance = userBalanceRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(PointErrorCode.BALANCE_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.BALANCE_NOT_FOUND)
         );
         balance.setTotalAmount(balance.getTotalAmount() + type.getDefaultAmount());
 
@@ -83,12 +82,12 @@ public class PointService {
     @Transactional
     public UserBalance updateBalanceManual(String studentNum ,String description, Long pointAmount) {
         User user = userRepository.findByStudentNum(studentNum).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
 
 
         UserBalance balance = userBalanceRepository.findById(user.getId()).orElseThrow(
-                () -> new NotFoundException(PointErrorCode.BALANCE_NOT_FOUND_PENDING)
+                () -> new GlobalNimdaException(ErrorCode.BALANCE_NOT_FOUND_PENDING)
         );
 
         balance.setUpdatedAt(LocalDateTime.now());
@@ -131,7 +130,7 @@ public class PointService {
     public UserBalance findUserBalance(Long userId) {
         return userBalanceRepository.findById(userId)
                 .orElseThrow(
-                        () -> new NotFoundException(PointErrorCode.BALANCE_NOT_FOUND)
+                        () -> new GlobalNimdaException(ErrorCode.BALANCE_NOT_FOUND)
                 );
     }
 

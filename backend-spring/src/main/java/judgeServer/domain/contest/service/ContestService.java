@@ -1,9 +1,7 @@
 package judgeServer.domain.contest.service;
 
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.ContestErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.contest.dto.AdminContestResponse;
 import judgeServer.domain.contest.dto.AdminScheduleResponse;
@@ -133,11 +131,11 @@ public class ContestService {
         validateRange(request);
         Contest latest = current().orElse(null);
         if (latest != null && !latest.isFinalized()) {
-            throw new InvalidStateException(ContestErrorCode.UNFINALIZED_CONTEST_EXISTS,
+            throw new GlobalNimdaException(ErrorCode.UNFINALIZED_CONTEST_EXISTS,
                     "결과가 확정되지 않은 대회(" + latest.getName() + ")가 있습니다. 종료 후 결과가 확정되면 새 대회를 만들 수 있습니다.");
         }
         if (!request.getStartsAt().isAfter(latest == null ? LocalDateTime.MIN : latest.getStartsAt())) {
-            throw new NotAllowFormException(ContestErrorCode.CONTEST_STARTS_BEFORE_PREVIOUS);
+            throw new GlobalNimdaException(ErrorCode.CONTEST_STARTS_BEFORE_PREVIOUS);
         }
 
         LocalDateTime now = now();
@@ -215,10 +213,10 @@ public class ContestService {
     @Transactional
     public void finalizeContest(Long contestId, Long adminUserId) {
         Contest c = contestRepository.findByIdForUpdate(contestId)
-                .orElseThrow(() -> new NotFoundException(ContestErrorCode.CONTEST_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CONTEST_NOT_FOUND));
         LocalDateTime now = now();
         if (c.phaseAt(now) != ContestPhase.ENDED) {
-            throw new InvalidStateException(ContestErrorCode.CONTEST_NOT_ENDED);
+            throw new GlobalNimdaException(ErrorCode.CONTEST_NOT_ENDED);
         }
         snapshot(c, adminUserId, now);
     }
@@ -264,7 +262,7 @@ public class ContestService {
         Contest c = current().orElse(null);
         if (c != null && c.phaseAt(now()) == ContestPhase.ENDED
                 && !Boolean.TRUE.equals(c.getChallengesVisibleAfterEnd())) {
-            throw new InvalidStateException(ContestErrorCode.CONTEST_ENDED);
+            throw new GlobalNimdaException(ErrorCode.CONTEST_ENDED);
         }
     }
 
@@ -276,7 +274,7 @@ public class ContestService {
 
     private static void validateRange(ContestSaveRequest request) {
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
-            throw new NotAllowFormException(ContestErrorCode.INVALID_CONTEST_RANGE);
+            throw new GlobalNimdaException(ErrorCode.INVALID_CONTEST_RANGE);
         }
     }
 

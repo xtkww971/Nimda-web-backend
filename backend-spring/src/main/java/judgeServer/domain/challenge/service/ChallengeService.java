@@ -1,9 +1,7 @@
 package judgeServer.domain.challenge.service;
 
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.attachment.store.S3FileStore;
 import judgeServer.domain.challenge.dto.AddChallengeRequest;
 import judgeServer.domain.challenge.entity.Challenge;
@@ -41,8 +39,8 @@ public class ChallengeService {
     @Transactional
     public Challenge addChallenge(AddChallengeRequest request) {
         if (challengeRepository.existsByCode(request.getCode())) {
-            throw new AlreadyExistException(ChallengeErrorCode.CHALLENGE_CODE_DUPLICATED,
-                    ChallengeErrorCode.CHALLENGE_CODE_DUPLICATED.getMessage() + " (" + request.getCode() + ")");
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_CODE_DUPLICATED,
+                    ErrorCode.CHALLENGE_CODE_DUPLICATED.getMessage() + " (" + request.getCode() + ")");
         }
 
         FlagType flagType = request.getFlagType() != null ? request.getFlagType() : FlagType.STATIC;
@@ -55,14 +53,14 @@ public class ChallengeService {
         int minPoint = request.getMinPoint() != null ? request.getMinPoint() : DEFAULT_MIN_POINT;
         int decreasePoint = request.getDecreasePoint() != null ? request.getDecreasePoint() : DEFAULT_DECREASE_POINT;
         if (minPoint > maxPoint) {
-            throw new NotAllowFormException(ChallengeErrorCode.INVALID_POINT_RANGE);
+            throw new GlobalNimdaException(ErrorCode.INVALID_POINT_RANGE);
         }
 
         // DYNAMIC은 사용자마다 플래그가 달라 미리 저장할 값이 없다.
         String flagHash = null;
         if (flagType == FlagType.STATIC) {
             if (request.getFlag() == null || request.getFlag().isBlank()) {
-                throw new NotAllowFormException(ChallengeErrorCode.STATIC_FLAG_REQUIRED);
+                throw new GlobalNimdaException(ErrorCode.STATIC_FLAG_REQUIRED);
             }
             flagHash = FlagHasher.hash(request.getFlag());
         }
@@ -108,7 +106,7 @@ public class ChallengeService {
     @Transactional
     public void deleteChallenge(Long id) {
         Challenge challenge = challengeRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         List<Long> solverTeamIds = solveRepository.findTeamIdsByChallengeId(id);
         solveRepository.deleteByChallengeId(id);
@@ -122,7 +120,7 @@ public class ChallengeService {
     @Transactional
     public boolean toggleIsPublic(Long id) {
         Challenge challenge = challengeRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         challenge.setIsPublic(!challenge.getIsPublic());
         return challenge.getIsPublic();

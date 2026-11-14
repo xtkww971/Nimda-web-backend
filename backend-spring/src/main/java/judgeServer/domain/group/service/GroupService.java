@@ -1,9 +1,7 @@
 package judgeServer.domain.group.service;
 
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.GroupErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
 import judgeServer.domain.group.dto.GroupCreateRequest;
@@ -94,12 +92,12 @@ public class GroupService {
     private Group getStudyGroup(Long groupId) {
         return groupRepository.findById(groupId)
                 .filter(Group::isStudy)
-                .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND));
     }
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(UserErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND));
     }
 
     private void validateLeader(Long groupId, Long userId) {
@@ -112,7 +110,7 @@ public class GroupService {
                 ? groupRepository.existsByNameAndType(name, GroupType.STUDY)
                 : groupRepository.existsByNameAndTypeAndIdNot(name, GroupType.STUDY, excludeGroupId);
         if (duplicated) {
-            throw new AlreadyExistException(GroupErrorCode.GROUP_NAME_DUPLICATED);
+            throw new GlobalNimdaException(ErrorCode.GROUP_NAME_DUPLICATED);
         }
     }
 

@@ -1,13 +1,8 @@
 package judgeServer.domain.instance.controller;
 
-import com.nimda.cite.common.exception.ExternalServiceException;
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.UnauthorizedException;
-import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
-import com.nimda.cite.common.exception.errorcode.ctf.InstanceErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
@@ -61,19 +56,19 @@ public class InstanceController {
 
         // WEB·PWN만 인스턴스를 띄운다. Judge의 분류(instanceCategories)와 같은 기준이다.
         if (!challenge.getCategory().usesInstance()) {
-            throw new NotAllowFormException(InstanceErrorCode.INSTANCE_NOT_SUPPORTED);
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_NOT_SUPPORTED);
         }
 
         // 버튼을 숨기는 것만으로는 API 직접 호출을 못 막는다. 꺼진 서버로 보낸 요청은 아무도 안 읽어서
         // PENDING에 멈추므로, 넣기 전에 거절한다 (CTF 레포 ADR-0022).
         if (!serverStatus.isAvailable()) {
-            throw new ExternalServiceException(InstanceErrorCode.CTF_SERVER_UNAVAILABLE);
+            throw new GlobalNimdaException(ErrorCode.CTF_SERVER_UNAVAILABLE);
         }
 
         String uuid = instanceService.createInstance(challenge, userId);
         if (uuid == null) {
             // WEB·PWN인데 isolationType이 NONE인 경우. 문제 설정이 잘못된 것이다.
-            throw new NotAllowFormException(InstanceErrorCode.INSTANCE_NOT_SUPPORTED);
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_NOT_SUPPORTED);
         }
         return ApiResponse.ok(view(uuid, request)).toResponse();
     }
@@ -111,7 +106,7 @@ public class InstanceController {
                                     HttpServletRequest request) {
         // 결과가 아직 없어도(PENDING) 소유자부터 확인한다. uuid만 알면 남의 상태를 볼 수 있으면 안 된다.
         if (!instanceService.isOwner(uuid, currentUserId(user))) {
-            throw new NotIncludeRoleException(InstanceErrorCode.INSTANCE_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_FORBIDDEN);
         }
         return ApiResponse.ok(view(uuid, request)).toResponse();
     }
@@ -128,16 +123,16 @@ public class InstanceController {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         return challenge;
     }
 
     private Long currentUserId(CustomUserDetails user) {
         if (user == null) {
-            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
         return user.getUser().getId();
     }

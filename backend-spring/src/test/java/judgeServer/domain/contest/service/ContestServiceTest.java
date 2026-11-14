@@ -1,7 +1,7 @@
 package judgeServer.domain.contest.service;
 
 import com.nimda.cite.common.exception.GlobalNimdaException;
-import com.nimda.cite.common.exception.errorcode.ctf.ContestErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.domain.contest.dto.ContestSaveRequest;
 import judgeServer.domain.contest.entity.Contest;
 import judgeServer.domain.contest.entity.ContestChangeLog;
@@ -72,7 +72,7 @@ class ContestServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.create(request(null, END, START), 1L));
         assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
-        assertEquals(ContestErrorCode.INVALID_CONTEST_RANGE, e.getErrorCode());
+        assertEquals(ErrorCode.INVALID_CONTEST_RANGE, e.getErrorCode());
         verify(contestRepository, never()).save(any());
     }
 
@@ -105,7 +105,7 @@ class ContestServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.create(request("NIMDACON 2027", START.plusYears(1), END.plusYears(1)), 1L));
         assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
-        assertEquals(ContestErrorCode.UNFINALIZED_CONTEST_EXISTS, e.getErrorCode());
+        assertEquals(ErrorCode.UNFINALIZED_CONTEST_EXISTS, e.getErrorCode());
     }
 
     @Test
@@ -173,7 +173,7 @@ class ContestServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.finalizeContest(1L, 1L));
         assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
-        assertEquals(ContestErrorCode.CONTEST_NOT_ENDED, e.getErrorCode());
+        assertEquals(ErrorCode.CONTEST_NOT_ENDED, e.getErrorCode());
         assertTrue(snapshotService.calls.isEmpty());
     }
 

@@ -1,8 +1,7 @@
 package com.nimda.cite.domain.like.service;
 
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.domain.BoardErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.UserErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.alarm.Event.PushLikeButtonEvent;
 import com.nimda.cite.domain.alarm.service.AlarmService;
 import com.nimda.cite.domain.board.entity.Board;
@@ -37,11 +36,11 @@ public class BoardLikeService {
     public String toggleLike(Long userId, Long boardId) {
         // 좋아요 누른 사람
         User liker = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
 
         Board board = boardRepository.findById(boardId).orElseThrow(
-                () -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.BOARD_NOT_FOUND)
         );
 
         Optional<BoardLike> like = boardLikeRepository.findByBoardAndLiker(board, liker);
@@ -74,7 +73,7 @@ public class BoardLikeService {
     @Transactional(readOnly = true)
     public long getLikeCount(Long boardId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.BOARD_NOT_FOUND));
         return boardLikeRepository.countByBoardId(boardId);
     }
 
@@ -82,11 +81,11 @@ public class BoardLikeService {
     @Transactional(readOnly = true)
     public boolean isUserLiked(Long userId, Long boardId) {
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
 
         Board board = boardRepository.findById(boardId).orElseThrow(
-                () -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.BOARD_NOT_FOUND)
         );
         return boardLikeRepository.existsByBoardIdAndLikerId(boardId, userId);
     }
@@ -94,7 +93,7 @@ public class BoardLikeService {
     @Transactional(readOnly = true)
     public long getTotalLikesReceived(Long authorId) {
         User user = userRepository.findById(authorId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
         return boardLikeRepository.countTotalLikesByAuthorId(authorId);
     }
@@ -102,7 +101,7 @@ public class BoardLikeService {
     @Transactional(readOnly = true)
     public List<Board> getTotalLikeBoards(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
         return boardLikeRepository.findAllByLikerId(userId).stream()
                 .map(BoardLike::getBoard)
@@ -113,7 +112,7 @@ public class BoardLikeService {
     @Transactional(readOnly = true)
     public long countTotalLikeBoards(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException(UserErrorCode.USER_NOT_FOUND)
+                () -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND)
         );
         // Repository에 countByLikerId 또는 유사한 메서드가 있어야 합니다.
         return boardLikeRepository.countByLikerId(userId);

@@ -1,6 +1,6 @@
 package judgeServer.domain.solve.controller;
 
-import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
@@ -71,7 +71,7 @@ public class FlagSubmissionController {
                 return ApiResponse.fail("대회가 종료되어 제출할 수 없습니다.").toResponse(HttpStatus.FORBIDDEN);
             }
             case NO_TEAM -> {
-                return ApiResponse.fail(TeamErrorCode.NO_TEAM.getMessage()).toResponse(TeamErrorCode.NO_TEAM.getHttpStatus());
+                return ApiResponse.fail(ErrorCode.NO_TEAM.getMessage()).toResponse(ErrorCode.NO_TEAM.getHttpStatus());
             }
             case UNSUPPORTED -> {
                 return ApiResponse.fail("DYNAMIC 플래그 제출은 아직 지원하지 않습니다.").toResponse(HttpStatus.BAD_REQUEST);

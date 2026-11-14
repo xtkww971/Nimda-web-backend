@@ -1,8 +1,7 @@
 package judgeServer.domain.solve.service;
 
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
-import com.nimda.cite.common.exception.errorcode.ctf.SolveErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.util.FlagHasher;
@@ -90,7 +89,7 @@ public class FlagSubmissionService {
             redisTemplate.expire(key, RATE_WINDOW);
         }
         if (attempts != null && attempts > MAX_ATTEMPTS_PER_WINDOW) {
-            throw new InvalidStateException(SolveErrorCode.TOO_MANY_SUBMISSIONS);
+            throw new GlobalNimdaException(ErrorCode.TOO_MANY_SUBMISSIONS);
         }
     }
 
@@ -116,7 +115,7 @@ public class FlagSubmissionService {
             return Optional.empty();
         }
         if (!String.valueOf(userId).equals(fields.get("userId"))) {
-            throw new NotIncludeRoleException(SolveErrorCode.SUBMISSION_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.SUBMISSION_FORBIDDEN);
         }
         return Optional.of(new SubmissionVerdict(
                 SubmissionVerdict.Status.valueOf((String) fields.get("status")),

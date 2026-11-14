@@ -1,7 +1,7 @@
 package judgeServer.domain.group.service;
 
 import com.nimda.cite.common.exception.GlobalNimdaException;
-import com.nimda.cite.common.exception.errorcode.ctf.TeamErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
@@ -72,7 +72,7 @@ class AdminTeamServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 1, 1L, List.of(2L))));
         assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
-        assertEquals(TeamErrorCode.TEAM_MEMBERS_OVER_CAPACITY, e.getErrorCode());
+        assertEquals(ErrorCode.TEAM_MEMBERS_OVER_CAPACITY, e.getErrorCode());
         verify(groupRepository, never()).save(any());
     }
 
@@ -87,7 +87,7 @@ class AdminTeamServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 4, null, List.of(1L))));
         assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
-        assertEquals(TeamErrorCode.TEAM_USER_ALREADY_ASSIGNED, e.getErrorCode());
+        assertEquals(ErrorCode.TEAM_USER_ALREADY_ASSIGNED, e.getErrorCode());
     }
 
     @Test
@@ -99,7 +99,7 @@ class AdminTeamServiceTest {
         GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 4, null, List.of(1L))));
         assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
-        assertEquals(TeamErrorCode.TEAM_USER_NOT_APPROVED, e.getErrorCode());
+        assertEquals(ErrorCode.TEAM_USER_NOT_APPROVED, e.getErrorCode());
     }
 
     private static TeamCreateRequest request(String name, int capacity, Long leaderId, List<Long> memberIds) {

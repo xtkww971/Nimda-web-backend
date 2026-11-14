@@ -1,8 +1,6 @@
 package com.nimda.cite.common.exception;
 
 import com.nimda.cite.common.exception.errorcode.ErrorCode;
-import com.nimda.cite.common.exception.errorcode.common.CommonErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -20,14 +18,6 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/**
- * handleExceptionInternal : dispatcher servlet이 던지는 예외를 각 예외별 처리를 해주는 ResponseEntityExceptionHandler 내부 오버라이딩 메서드
- * handleMethodArgumentNotValid : @Valid check를 통해 던지는 오류 처리 오버라이딩 메서드
- *
- * 모든 에러 응답은 ApiResponse.fail(message) 형식으로 통일한다.
- * - 비즈니스 예외 : GlobalNimdaException(ErrorCode) → ErrorCode의 status / message 사용
- * - 예상하지 못한 예외 : 내부 메시지를 노출하지 않고 CommonErrorCode.INTERNAL_SERVER_ERROR 메시지로 응답
- */
 
 @Slf4j
 @RestControllerAdvice
@@ -37,8 +27,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Spring MVC Exception : {} - {}", statusCode.value(), ex.getMessage());
 
         ErrorCode errorCode = statusCode.is5xxServerError()
-                ? CommonErrorCode.INTERNAL_SERVER_ERROR
-                : CommonErrorCode.INVALID_INPUT;
+                ? ErrorCode.INTERNAL_SERVER_ERROR
+                : ErrorCode.INVALID_INPUT;
 
         return ResponseEntity
                 .status(statusCode)
@@ -52,12 +42,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
-                .orElse(CommonErrorCode.INVALID_INPUT.getMessage());
+                .orElse(ErrorCode.INVALID_INPUT.getMessage());
 
-        log.warn("Nimda Validation Exception : {} - {}", CommonErrorCode.INVALID_INPUT.getErrorNum(), message);
+        log.warn("Nimda Validation Exception : {} - {}", ErrorCode.INVALID_INPUT.getErrorNum(), message);
 
         return ResponseEntity
-                .status(CommonErrorCode.INVALID_INPUT.getHttpStatus())
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
                 .body(ApiResponse.fail(message));
     }
 
@@ -72,37 +62,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
-    /**
-     * @PreAuthorize 등 메서드 보안에서 던지는 권한 예외 (Exception 핸들러에 먹혀 500이 되지 않도록 별도 처리)
-     */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException e){
-        log.warn("Nimda Access Denied : {} - {}", CommonErrorCode.ACCESS_DENIED.getErrorNum(), e.getMessage());
+        log.warn("Nimda Access Denied : {} - {}", ErrorCode.ACCESS_DENIED.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(CommonErrorCode.ACCESS_DENIED.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.ACCESS_DENIED.getMessage()));
+                .status(ErrorCode.ACCESS_DENIED.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.ACCESS_DENIED.getMessage()));
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException e){
-        log.warn("Nimda Authentication Exception : {} - {}", AuthErrorCode.CANNOT_AUTHORIZED.getErrorNum(), e.getMessage());
+        log.warn("Nimda Authentication Exception : {} - {}", ErrorCode.CANNOT_AUTHORIZED.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(AuthErrorCode.CANNOT_AUTHORIZED.getHttpStatus())
-                .body(ApiResponse.fail(AuthErrorCode.CANNOT_AUTHORIZED.getMessage()));
+                .status(ErrorCode.CANNOT_AUTHORIZED.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.CANNOT_AUTHORIZED.getMessage()));
     }
 
-    /**
-     * CheckConfig 등 입력값 검증에서 던지는 예외
-     */
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException e){
-        log.warn("Nimda Invalid Input : {} - {}", CommonErrorCode.INVALID_INPUT.getErrorNum(), e.getMessage());
+        log.warn("Nimda Invalid Input : {} - {}", ErrorCode.INVALID_INPUT.getErrorNum(), e.getMessage());
 
         return ResponseEntity
-                .status(CommonErrorCode.INVALID_INPUT.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.INVALID_INPUT.getMessage()));
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
@@ -110,16 +95,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("Unhandled Exception : ", e);
 
         return ResponseEntity
-                .status(CommonErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
-                .body(ApiResponse.fail(CommonErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
     }
 
-    /**
-     * ResponseStatusException을 ApiResponse 포맷으로 변환한다.
-     * 비즈니스 예외는 GlobalNimdaException(ErrorCode)로 던지지만, 스프링/라이브러리가 던지는
-     * ResponseStatusException이 그대로 나가면 {success, message, data} 공통 응답과 어긋난다.
-     * 던진 상태 코드는 유지하고 reason을 message로 돌려준다.
-     */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Object>> handleResponseStatus(ResponseStatusException ex) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());

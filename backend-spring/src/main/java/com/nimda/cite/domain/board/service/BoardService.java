@@ -1,11 +1,7 @@
 package com.nimda.cite.domain.board.service;
 
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
-import com.nimda.cite.common.exception.errorcode.domain.BoardErrorCode;
-import com.nimda.cite.common.exception.errorcode.domain.CategoryErrorCode;
-import com.nimda.cite.common.exception.errorcode.domain.TagErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.attachment.service.AttachmentService;
 import com.nimda.cite.domain.alarm.service.AlarmService;
 import com.nimda.cite.domain.board.dto.BoardTagStatsResponseDTO;
@@ -105,7 +101,7 @@ public class BoardService {
 
         // news 권한 체크 - ROLE_DEV인 경우, "news - notice - #패치" 에 글을 쓸 수 있음
         if (isCategoryMatch(category, "news") && !isAdmin && !isDevPatchAllowed(author, category, tagEntity)) {
-            throw new NotIncludeRoleException(BoardErrorCode.BOARD_ACCESS_DENIED);
+            throw new GlobalNimdaException(ErrorCode.BOARD_ACCESS_DENIED);
         }
 
         // "카르텔" 카테고리 접근 권한 확인
@@ -114,7 +110,7 @@ public class BoardService {
         boolean isShopCategory = isShopCategory(category);
         if (isShopCategory) {
             if (!isAdmin) {
-                throw new NotIncludeRoleException(BoardErrorCode.SHOP_WRITE_FORBIDDEN);
+                throw new GlobalNimdaException(ErrorCode.SHOP_WRITE_FORBIDDEN);
             }
             validateItemPrice(request.getItemPrice());
         }
@@ -145,7 +141,7 @@ public class BoardService {
         boolean isAdmin = hasRole(currentUser, "ROLE_ADMIN");
 
         if (!isAdmin && !boardTemp.getAuthor().getId().equals(currentUser.getId())) {
-            throw new NotIncludeRoleException(BoardErrorCode.BOARD_UPDATE_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.BOARD_UPDATE_FORBIDDEN);
         }
 
         Category category = findCategory(request.getCategoryId());
@@ -155,7 +151,7 @@ public class BoardService {
 
         // news 권한 체크
         if (isCategoryMatch(category, "news") && !isAdmin && !isDevPatchAllowed(currentUser, category, tagEntity)) {
-            throw new NotIncludeRoleException(BoardErrorCode.NEWS_UPDATE_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.NEWS_UPDATE_FORBIDDEN);
         }
 
         // "카르텔" 카테고리 접근 권한 확인
@@ -164,7 +160,7 @@ public class BoardService {
         boolean isShopCategory = isShopCategory(category);
         if (isShopCategory) {
             if (!isAdmin) {
-                throw new NotIncludeRoleException(BoardErrorCode.SHOP_UPDATE_FORBIDDEN);
+                throw new GlobalNimdaException(ErrorCode.SHOP_UPDATE_FORBIDDEN);
             }
             validateItemPrice(request.getItemPrice());
         }
@@ -206,12 +202,12 @@ public class BoardService {
         }
         if (slug != null) {
             if (!isValidSlug(slug)) {
-                throw new NotAllowFormException(CategoryErrorCode.INVALID_SLUG);
+                throw new GlobalNimdaException(ErrorCode.INVALID_SLUG);
             }
             return categoryRepository.findBySlugAndIsActiveTrue(slug)
-                    .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                    .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
         }
-        throw new NotAllowFormException(CategoryErrorCode.CATEGORY_PARAM_REQUIRED);
+        throw new GlobalNimdaException(ErrorCode.CATEGORY_PARAM_REQUIRED);
     }
 
     // Note. checkCategoryReadable - "카르텔" 카테고리는 ROLE_CARTEL 또는 ROLE_ADMIN만 접근할 수 있다.
@@ -219,7 +215,7 @@ public class BoardService {
     public void checkCategoryReadable(Category category, User user) {
         if (isCategoryMatch(category, "cartel")
                 && !hasRole(user, "ROLE_CARTEL") && !hasRole(user, "ROLE_ADMIN")) {
-            throw new NotIncludeRoleException(BoardErrorCode.BOARD_ACCESS_DENIED);
+            throw new GlobalNimdaException(ErrorCode.BOARD_ACCESS_DENIED);
         }
     }
 
@@ -296,7 +292,7 @@ public class BoardService {
         Board board = findBoard(id);
 
         if (!hasRole(currentUser, "ROLE_ADMIN") && !board.getAuthor().getId().equals(currentUser.getId())) {
-            throw new NotIncludeRoleException(BoardErrorCode.BOARD_DELETE_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.BOARD_DELETE_FORBIDDEN);
         }
 
         boardDelete(id);
@@ -319,7 +315,7 @@ public class BoardService {
     @Transactional
     public Board toggleBoardPin(Long id, User currentUser) {
         if (!hasRole(currentUser, "ROLE_ADMIN")) {
-            throw new NotIncludeRoleException(BoardErrorCode.BOARD_PIN_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.BOARD_PIN_FORBIDDEN);
         }
 
         Board board = findBoard(id);
@@ -348,7 +344,7 @@ public class BoardService {
     @Transactional
     public void deleteMyBoards(List<Long> boardIds, User author) {
         if (boardIds == null || boardIds.isEmpty()) {
-            throw new NotAllowFormException(BoardErrorCode.DELETE_TARGET_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.DELETE_TARGET_REQUIRED);
         }
 
         List<Board> boards = boardRepository.findAllById(boardIds);
@@ -407,12 +403,12 @@ public class BoardService {
 
     private Board findBoard(Long id) {
         return boardRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(BoardErrorCode.BOARD_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.BOARD_NOT_FOUND));
     }
 
     private Category findCategory(Long categoryId) {
         return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException(CategoryErrorCode.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CATEGORY_NOT_FOUND));
     }
 
     private Tag resolveTag(Long tagId, Category category) {
@@ -420,9 +416,9 @@ public class BoardService {
             return null;
         }
         Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new NotFoundException(TagErrorCode.TAG_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.TAG_NOT_FOUND));
         if (!tag.getCategory().getId().equals(category.getId())) {
-            throw new NotAllowFormException(TagErrorCode.TAG_NOT_IN_CATEGORY);
+            throw new GlobalNimdaException(ErrorCode.TAG_NOT_IN_CATEGORY);
         }
         return tag;
     }
@@ -478,7 +474,7 @@ public class BoardService {
 
     private void validateItemPrice(Long itemPrice) {
         if (itemPrice == null || itemPrice <= 0) {
-            throw new NotAllowFormException(BoardErrorCode.INVALID_ITEM_PRICE);
+            throw new GlobalNimdaException(ErrorCode.INVALID_ITEM_PRICE);
         }
     }
 
@@ -494,7 +490,7 @@ public class BoardService {
                 ? attachmentService.resolveThumbnailAttachmentId(request.getAttachmentIds(), request.getThumbnailAttachmentId())
                 : null;
         if (isShopCategory && resolvedThumbnailAttachmentId == null) {
-            throw new NotAllowFormException(BoardErrorCode.SHOP_THUMBNAIL_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.SHOP_THUMBNAIL_REQUIRED);
         }
 
         board.setItemPrice(isShopCategory ? request.getItemPrice() : 0L);
@@ -511,7 +507,7 @@ public class BoardService {
         try {
             return ShopItemType.valueOf(itemType.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new NotAllowFormException(BoardErrorCode.INVALID_ITEM_TYPE);
+            throw new GlobalNimdaException(ErrorCode.INVALID_ITEM_TYPE);
         }
     }
 
@@ -520,13 +516,13 @@ public class BoardService {
             return null;
         }
         if (profileDecorationId == null) {
-            throw new NotAllowFormException(BoardErrorCode.SHOP_BADGE_REQUIRED);
+            throw new GlobalNimdaException(ErrorCode.SHOP_BADGE_REQUIRED);
         }
 
         ProfileDecoration decoration = profileDecorationRepository.findById(profileDecorationId)
-                .orElseThrow(() -> new NotFoundException(BoardErrorCode.SHOP_BADGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.SHOP_BADGE_NOT_FOUND));
         if (!decoration.isActive()) {
-            throw new NotAllowFormException(BoardErrorCode.SHOP_BADGE_INACTIVE);
+            throw new GlobalNimdaException(ErrorCode.SHOP_BADGE_INACTIVE);
         }
         decoration.setPurchaseRequired(true);
         profileDecorationRepository.save(decoration);

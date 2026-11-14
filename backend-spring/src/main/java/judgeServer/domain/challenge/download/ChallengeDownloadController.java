@@ -1,11 +1,8 @@
 package judgeServer.domain.challenge.download;
 
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
+import com.nimda.cite.common.exception.GlobalNimdaException;
 import com.nimda.cite.common.exception.UnauthorizedException;
-import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
-import com.nimda.cite.common.exception.errorcode.user.AuthErrorCode;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
@@ -53,19 +50,19 @@ public class ChallengeDownloadController {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 받아갈 수 있으면 안 된다.
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new NotFoundException(ChallengeErrorCode.CHALLENGE_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
         // 다운로드 링크 대신 컨테이너를 띄운다(누를 때마다 새 uuid라 하나씩 쌓인다).
         if (challenge.getCategory().usesInstance()) {
-            throw new NotAllowFormException(ChallengeErrorCode.DOWNLOAD_NOT_SUPPORTED);
+            throw new GlobalNimdaException(ErrorCode.DOWNLOAD_NOT_SUPPORTED);
         }
         if (challenge.getAttachmentKey() == null || challenge.getAttachmentKey().isBlank()) {
-            throw new NotFoundException(ChallengeErrorCode.ATTACHMENT_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_ATTACHMENT_NOT_FOUND);
         }
 
         Long userId = requireUserId(user);
@@ -147,13 +144,13 @@ public class ChallengeDownloadController {
     private void checkOwner(String requestId, CustomUserDetails user) {
         Long owner = producer.findUserId(requestId);
         if (user == null || owner == null || !owner.equals(user.getUser().getId())) {
-            throw new NotIncludeRoleException(ChallengeErrorCode.DOWNLOAD_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.DOWNLOAD_FORBIDDEN);
         }
     }
 
     private Long requireUserId(CustomUserDetails user) {
         if (user == null) {
-            throw new UnauthorizedException(AuthErrorCode.CANNOT_AUTHORIZED);
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
         return user.getUser().getId();
     }

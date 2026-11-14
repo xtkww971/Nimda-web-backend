@@ -1,10 +1,7 @@
 package judgeServer.domain.groupMember.service;
 
-import com.nimda.cite.common.exception.AlreadyExistException;
-import com.nimda.cite.common.exception.InvalidStateException;
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.NotIncludeRoleException;
-import com.nimda.cite.common.exception.errorcode.ctf.GroupErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import judgeServer.domain.group.entity.Group;
 import judgeServer.domain.group.repository.GroupRepository;
@@ -37,7 +34,7 @@ public class GroupMemberService {
     @Transactional
     public GroupMember addMember(Group group, User user, MemberRole role) {
         if (memberRepository.existsByGroupIdAndUserId(group.getId(), user.getId())) {
-            throw new AlreadyExistException(GroupErrorCode.ALREADY_GROUP_MEMBER);
+            throw new GlobalNimdaException(ErrorCode.ALREADY_GROUP_MEMBER);
         }
         GroupMember member = GroupMember.builder()
                 .group(group)
@@ -51,11 +48,11 @@ public class GroupMemberService {
     @Transactional
     public void transferLeadership(Long groupId, Long currentLeaderId, Long newLeaderId) {
         if (currentLeaderId.equals(newLeaderId)) {
-            throw new InvalidStateException(GroupErrorCode.LEADER_TRANSFER_TO_SELF);
+            throw new GlobalNimdaException(ErrorCode.LEADER_TRANSFER_TO_SELF);
         }
         GroupMember currentLeader = getMember(groupId, currentLeaderId);
         if (currentLeader.getRole() != MemberRole.LEADER) {
-            throw new NotIncludeRoleException(GroupErrorCode.LEADER_TRANSFER_FORBIDDEN);
+            throw new GlobalNimdaException(ErrorCode.LEADER_TRANSFER_FORBIDDEN);
         }
         GroupMember newLeader = getMember(groupId, newLeaderId);
 
@@ -68,7 +65,7 @@ public class GroupMemberService {
     public void leave(Long groupId, Long userId) {
         GroupMember member = getMember(groupId, userId);
         if (member.getRole() == MemberRole.LEADER) {
-            throw new InvalidStateException(GroupErrorCode.LEADER_CANNOT_LEAVE);
+            throw new GlobalNimdaException(ErrorCode.LEADER_CANNOT_LEAVE);
         }
         memberRepository.delete(member);
     }
@@ -78,7 +75,7 @@ public class GroupMemberService {
     public void kick(Long groupId, Long leaderId, Long targetUserId) {
         validateLeader(groupId, leaderId);
         if (leaderId.equals(targetUserId)) {
-            throw new InvalidStateException(GroupErrorCode.CANNOT_KICK_SELF);
+            throw new GlobalNimdaException(ErrorCode.CANNOT_KICK_SELF);
         }
         GroupMember target = getMember(groupId, targetUserId);
         memberRepository.delete(target);
@@ -88,14 +85,14 @@ public class GroupMemberService {
     // 스터디 그룹 API(탈퇴·강퇴·위임·그룹장 확인)에서는 CTF 팀 멤버를 없는 것으로 본다.
     private void requireStudyGroup(Long groupId) {
         if (!groupRepository.findById(groupId).map(Group::isStudy).orElse(false)) {
-            throw new NotFoundException(GroupErrorCode.GROUP_NOT_FOUND);
+            throw new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND);
         }
     }
 
     private GroupMember getMember(Long groupId, Long userId) {
         return memberRepository.findByGroupIdAndUserId(groupId, userId)
                 .filter(member -> member.getGroup().isStudy())
-                .orElseThrow(() -> new NotFoundException(GroupErrorCode.GROUP_MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
     }
 
     // 그룹장 여부 확인 (예외를 던지지 않는 단순 조회용, 예: 신청/초대 처리 권한 판단)
@@ -112,7 +109,7 @@ public class GroupMemberService {
     public GroupMember validateLeader(Long groupId, Long userId) {
         GroupMember member = getMember(groupId, userId);
         if (member.getRole() != MemberRole.LEADER) {
-            throw new NotIncludeRoleException(GroupErrorCode.GROUP_LEADER_ONLY);
+            throw new GlobalNimdaException(ErrorCode.GROUP_LEADER_ONLY);
         }
         return member;
     }

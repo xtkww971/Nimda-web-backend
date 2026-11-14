@@ -1,7 +1,7 @@
 package judgeServer.domain.challenge.service;
 
-import com.nimda.cite.common.exception.NotAllowFormException;
-import com.nimda.cite.common.exception.errorcode.ctf.ChallengeErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.enums.FlagType;
 import judgeServer.domain.challenge.enums.IsolationType;
@@ -29,7 +29,7 @@ public final class ChallengeRules {
     public static void validate(ChallengeCategory category, IsolationType isolation, FlagType flagType) {
         String reason = reason(category, isolation, flagType);
         if (reason != null) {
-            throw new NotAllowFormException(ChallengeErrorCode.INVALID_CHALLENGE_RULE, reason);
+            throw new GlobalNimdaException(ErrorCode.INVALID_CHALLENGE_RULE, reason);
         }
     }
 

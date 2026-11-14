@@ -1,7 +1,7 @@
 package judgeServer.domain.contest.service;
 
-import com.nimda.cite.common.exception.NotFoundException;
-import com.nimda.cite.common.exception.errorcode.ctf.ContestErrorCode;
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.domain.contest.dto.ContestDetailResponse;
 import judgeServer.domain.contest.dto.ContestListResponse;
 import judgeServer.domain.contest.entity.Contest;
@@ -92,7 +92,7 @@ public class ContestHistoryService {
     public ContestDetailResponse detail(Long contestId, Long userId) {
         Contest c = contestRepository.findById(contestId)
                 .filter(Contest::isFinalized)
-                .orElseThrow(() -> new NotFoundException(ContestErrorCode.CONTEST_RESULT_NOT_FOUND));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CONTEST_RESULT_NOT_FOUND));
 
         List<ContestResult> results = resultRepository.findStandings(contestId);
         List<ContestDetailResponse.Standing> standings = results.stream()
