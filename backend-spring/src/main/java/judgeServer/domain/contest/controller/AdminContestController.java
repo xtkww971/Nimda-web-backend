@@ -1,6 +1,7 @@
 package judgeServer.domain.contest.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import judgeServer.domain.contest.dto.ContestSaveRequest;
@@ -24,26 +25,26 @@ import org.springframework.web.bind.annotation.*;
  * <p>종료 후 1분이 지나면 결과는 자동으로 확정된다.
  */
 @RestController
-@RequestMapping("/api/admin/ctf/contests")
+@RequestMapping(UrlNames.adminContestUrl)
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminContestController {
 
     private final ContestService contestService;
 
-    @GetMapping
+    @GetMapping(UrlNames.getAdminContestsUrl)
     public ResponseEntity<?> list() {
         return ApiResponse.ok(contestService.listForAdmin()).toResponse();
     }
 
-    @PostMapping
+    @PostMapping(UrlNames.createContestUrl)
     public ResponseEntity<?> create(@Valid @RequestBody ContestSaveRequest request,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         return ApiResponse.ok("대회가 생성되었습니다.", contestService.create(request, user.getUser().getId()))
                 .toResponse(HttpStatus.CREATED);
     }
 
-    @PostMapping("/{contestId}/finalize")
+    @PostMapping(UrlNames.finalizeContestUrl)
     public ResponseEntity<?> finalizeContest(@PathVariable Long contestId,
                                              @AuthenticationPrincipal CustomUserDetails user) {
         contestService.finalizeContest(contestId, user.getUser().getId());

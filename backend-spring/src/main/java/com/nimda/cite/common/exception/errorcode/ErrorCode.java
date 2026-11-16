@@ -126,7 +126,59 @@ public enum ErrorCode {
     // 계정 복구
     RECOVERY_SESSION_EXPIRED(HttpStatus.FORBIDDEN, "UR001", "인증 세션이 만료되었습니다."),
     AUTH_CODE_MISMATCH(HttpStatus.UNAUTHORIZED, "UR002", "인증에 실패했습니다."),
-    EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "UR003", "이메일 인증이 완료되지 않은 요청입니다.");
+    EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "UR003", "이메일 인증이 완료되지 않은 요청입니다."),
+    // CTF 문제
+    CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "CH001", "존재하지 않는 문제입니다."),
+    CHALLENGE_CODE_DUPLICATED(HttpStatus.CONFLICT, "CH002", "이미 존재하는 문제 코드입니다."),
+    INVALID_CHALLENGE_RULE(HttpStatus.BAD_REQUEST, "CH003", "허용되지 않는 문제 유형 조합입니다."),
+    INVALID_POINT_RANGE(HttpStatus.BAD_REQUEST, "CH004", "최소 점수는 최대 점수보다 클 수 없습니다."),
+    STATIC_FLAG_REQUIRED(HttpStatus.BAD_REQUEST, "CH005", "STATIC 문제는 플래그가 필요합니다."),
+    DOWNLOAD_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "CH006", "인스턴스 문제는 첨부파일 다운로드를 지원하지 않습니다."),
+    CHALLENGE_ATTACHMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CH007", "첨부파일이 없는 문제입니다."),
+    DOWNLOAD_FORBIDDEN(HttpStatus.FORBIDDEN, "CH008", "본인이 요청한 다운로드가 아닙니다."),
+    // CTF 대회
+    CONTEST_NOT_FOUND(HttpStatus.NOT_FOUND, "CN001", "존재하지 않는 대회입니다."),
+    UNFINALIZED_CONTEST_EXISTS(HttpStatus.CONFLICT, "CN002", "결과가 확정되지 않은 대회가 있습니다. 종료 후 결과가 확정되면 새 대회를 만들 수 있습니다."),
+    CONTEST_STARTS_BEFORE_PREVIOUS(HttpStatus.BAD_REQUEST, "CN003", "새 대회는 이전 대회보다 늦게 시작해야 합니다."),
+    CONTEST_NOT_ENDED(HttpStatus.CONFLICT, "CN004", "아직 종료되지 않은 대회입니다."),
+    CONTEST_ENDED(HttpStatus.FORBIDDEN, "CN005", "대회가 종료되었습니다."),
+    INVALID_CONTEST_RANGE(HttpStatus.BAD_REQUEST, "CN006", "종료 시각은 시작 시각보다 늦어야 합니다."),
+    CONTEST_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "CN007", "결과가 확정된 대회가 아닙니다."),
+    // 스터디 그룹
+    GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GR001", "존재하지 않는 그룹입니다."),
+    GROUP_NAME_DUPLICATED(HttpStatus.CONFLICT, "GR002", "이미 사용 중인 그룹 이름입니다."),
+    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GR003", "그룹 멤버가 아닙니다."),
+    ALREADY_GROUP_MEMBER(HttpStatus.CONFLICT, "GR004", "이미 그룹에 가입되어 있습니다."),
+    GROUP_CAPACITY_EXCEEDED(HttpStatus.BAD_REQUEST, "GR005", "그룹 정원이 초과되었습니다."),
+    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GR006", "그룹장만 수행할 수 있습니다."),
+    LEADER_TRANSFER_FORBIDDEN(HttpStatus.FORBIDDEN, "GR007", "그룹장만 위임할 수 있습니다."),
+    LEADER_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "GR008", "본인에게 위임할 수 없습니다."),
+    LEADER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "GR009", "그룹장은 위임 후 탈퇴할 수 있습니다."),
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "GR010", "본인을 강퇴할 수 없습니다."),
+    JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "GR011", "존재하지 않는 요청입니다."),
+    JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "GR012", "이미 처리된 요청입니다."),
+    JOIN_REQUEST_ALREADY_PENDING(HttpStatus.CONFLICT, "GR013", "이미 진행 중인 요청이 존재합니다."),
+    JOIN_REQUEST_CANCEL_FORBIDDEN(HttpStatus.FORBIDDEN, "GR014", "본인의 요청만 취소할 수 있습니다."),
+    JOIN_REQUEST_APPLY_LEADER_ONLY(HttpStatus.FORBIDDEN, "GR015", "그룹장만 신청을 수락/거절할 수 있습니다."),
+    JOIN_REQUEST_INVITEE_ONLY(HttpStatus.FORBIDDEN, "GR016", "초대받은 본인만 수락/거절할 수 있습니다."),
+    // CTF 팀
+    TEAM_NOT_FOUND(HttpStatus.NOT_FOUND, "TM001", "존재하지 않는 팀입니다."),
+    TEAM_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "TM002", "해당 유저는 이 팀의 멤버가 아닙니다."),
+    TEAM_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "TM003", "존재하지 않는 유저입니다."),
+    TEAM_USER_NOT_APPROVED(HttpStatus.BAD_REQUEST, "TM004", "승인되지 않은 유저는 팀에 넣을 수 없습니다."),
+    TEAM_USER_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "TM005", "이미 다른 팀에 속한 유저가 있습니다."),
+    TEAM_NAME_DUPLICATED(HttpStatus.CONFLICT, "TM006", "이미 사용 중인 팀 이름입니다."),
+    TEAM_MEMBERS_OVER_CAPACITY(HttpStatus.BAD_REQUEST, "TM007", "멤버 수가 최대 인원을 넘습니다."),
+    TEAM_CAPACITY_BELOW_MEMBERS(HttpStatus.BAD_REQUEST, "TM008", "현재 멤버 수보다 최대 인원을 작게 할 수 없습니다."),
+    TEAM_FULL(HttpStatus.BAD_REQUEST, "TM009", "팀 정원을 넘습니다."),
+    NO_TEAM(HttpStatus.FORBIDDEN, "TM010", "팀에 소속되어 있지 않습니다. 운영진이 팀을 배정하면 문제가 공개됩니다."),
+    // CTF 인스턴스
+    INSTANCE_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "IN001", "해당 문제는 인스턴스 기능을 지원하지 않습니다."),
+    CTF_SERVER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "IN002", "CTF 서버가 아직 작동중이지 않습니다."),
+    INSTANCE_FORBIDDEN(HttpStatus.FORBIDDEN, "IN003", "본인 인스턴스가 아닙니다."),
+    // CTF 플래그 제출
+    TOO_MANY_SUBMISSIONS(HttpStatus.TOO_MANY_REQUESTS, "SV001", "제출이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+    SUBMISSION_FORBIDDEN(HttpStatus.FORBIDDEN, "SV002", "본인의 제출이 아닙니다.");
 
     private final HttpStatus httpStatus;
     private final String errorNum;

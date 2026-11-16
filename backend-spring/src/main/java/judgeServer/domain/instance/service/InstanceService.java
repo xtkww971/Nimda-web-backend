@@ -1,14 +1,14 @@
-package judgeServer.domain.instance.Service;
+package judgeServer.domain.instance.service;
 
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.domain.challenge.enums.IsolationType;
 import judgeServer.config.InstanceProperties;
-import judgeServer.domain.instance.ObjectStatus.InstanceStatus;
-import judgeServer.domain.instance.ObjectStatus.Status;
-import judgeServer.domain.instance.Repository.InstanceResultStore;
-import judgeServer.domain.instance.Proxy.SubdomainInstanceProxyFilter;
-import judgeServer.domain.instance.Repository.InstanceStatusStore;
+import judgeServer.domain.instance.dto.InstanceStatus;
+import judgeServer.domain.instance.enums.Status;
+import judgeServer.domain.instance.repository.InstanceResultStore;
+import judgeServer.domain.instance.proxy.SubdomainInstanceProxyFilter;
+import judgeServer.domain.instance.repository.InstanceStatusStore;
 import redis.mq.message.CtfResultMessage;
 import redis.mq.message.RequestStatus;
 import judgeServer.config.CtfTtlProperties;

@@ -1,29 +1,32 @@
 package judgeServer.domain.challenge.download;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
-import judgeServer.domain.group.service.CtfTeamResolver;
-import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.challenge.entity.Challenge;
-import redis.mq.message.CtfResultMessage;
-import redis.mq.message.RequestStatus;
-import redis.mq.producer.RedisCtfRequestProducer;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
 import judgeServer.domain.challenge.service.ChallengeRules;
+import judgeServer.domain.contest.service.ContestService;
+import judgeServer.domain.group.service.CtfTeamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import redis.mq.message.CtfResultMessage;
+import redis.mq.message.RequestStatus;
+import redis.mq.producer.RedisCtfRequestProducer;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/ctf/challenge")
+@RequestMapping(UrlNames.challengeUrl)
 @RequiredArgsConstructor
 public class ChallengeDownloadController {
 
@@ -40,26 +43,26 @@ public class ChallengeDownloadController {
     private final ContestService contestService;
 
     // 문제 코드로 다운로드 링크 요청
-    @PostMapping("/{code}/download")
+    @PostMapping(UrlNames.requestChallengeDownloadUrl)
     public ResponseEntity<?> request(@PathVariable String code,
                                      @AuthenticationPrincipal CustomUserDetails user) {
         // 팀전이라 팀이 없는 참가자는 문제 파일을 받을 수 없다 (관리자·DEV 제외).
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 받아갈 수 있으면 안 된다.
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
         // 다운로드 링크 대신 컨테이너를 띄운다(누를 때마다 새 uuid라 하나씩 쌓인다).
         if (challenge.getCategory().usesInstance()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인스턴스 문제는 첨부파일 다운로드를 지원하지 않습니다.");
+            throw new GlobalNimdaException(ErrorCode.DOWNLOAD_NOT_SUPPORTED);
         }
         if (challenge.getAttachmentKey() == null || challenge.getAttachmentKey().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일이 없는 문제입니다.");
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_ATTACHMENT_NOT_FOUND);
         }
 
         Long userId = requireUserId(user);
@@ -88,7 +91,7 @@ public class ChallengeDownloadController {
     }
 
     /** 발급 결과를 조회한다 (아직이면 PENDING). */
-    @GetMapping("/download/{requestId}")
+    @GetMapping(UrlNames.getChallengeDownloadStatusUrl)
     public ResponseEntity<?> status(@PathVariable String requestId,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         CtfResultMessage result = resultStore.find(requestId).orElse(null);
@@ -141,13 +144,13 @@ public class ChallengeDownloadController {
     private void checkOwner(String requestId, CustomUserDetails user) {
         Long owner = producer.findUserId(requestId);
         if (user == null || owner == null || !owner.equals(user.getUser().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 요청한 다운로드가 아닙니다.");
+            throw new GlobalNimdaException(ErrorCode.DOWNLOAD_FORBIDDEN);
         }
     }
 
     private Long requireUserId(CustomUserDetails user) {
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
         return user.getUser().getId();
     }

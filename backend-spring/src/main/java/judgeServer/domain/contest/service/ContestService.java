@@ -1,5 +1,7 @@
 package judgeServer.domain.contest.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.contest.dto.AdminContestResponse;
 import judgeServer.domain.contest.dto.AdminScheduleResponse;
@@ -16,10 +18,8 @@ import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -131,11 +131,11 @@ public class ContestService {
         validateRange(request);
         Contest latest = current().orElse(null);
         if (latest != null && !latest.isFinalized()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new GlobalNimdaException(ErrorCode.UNFINALIZED_CONTEST_EXISTS,
                     "결과가 확정되지 않은 대회(" + latest.getName() + ")가 있습니다. 종료 후 결과가 확정되면 새 대회를 만들 수 있습니다.");
         }
         if (!request.getStartsAt().isAfter(latest == null ? LocalDateTime.MIN : latest.getStartsAt())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "새 대회는 이전 대회보다 늦게 시작해야 합니다.");
+            throw new GlobalNimdaException(ErrorCode.CONTEST_STARTS_BEFORE_PREVIOUS);
         }
 
         LocalDateTime now = now();
@@ -213,10 +213,10 @@ public class ContestService {
     @Transactional
     public void finalizeContest(Long contestId, Long adminUserId) {
         Contest c = contestRepository.findByIdForUpdate(contestId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 대회입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CONTEST_NOT_FOUND));
         LocalDateTime now = now();
         if (c.phaseAt(now) != ContestPhase.ENDED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "아직 종료되지 않은 대회입니다.");
+            throw new GlobalNimdaException(ErrorCode.CONTEST_NOT_ENDED);
         }
         snapshot(c, adminUserId, now);
     }
@@ -262,7 +262,7 @@ public class ContestService {
         Contest c = current().orElse(null);
         if (c != null && c.phaseAt(now()) == ContestPhase.ENDED
                 && !Boolean.TRUE.equals(c.getChallengesVisibleAfterEnd())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "대회가 종료되었습니다.");
+            throw new GlobalNimdaException(ErrorCode.CONTEST_ENDED);
         }
     }
 
@@ -274,7 +274,7 @@ public class ContestService {
 
     private static void validateRange(ContestSaveRequest request) {
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료 시각은 시작 시각보다 늦어야 합니다.");
+            throw new GlobalNimdaException(ErrorCode.INVALID_CONTEST_RANGE);
         }
     }
 

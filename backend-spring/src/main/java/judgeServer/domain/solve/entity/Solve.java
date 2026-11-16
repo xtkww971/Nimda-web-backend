@@ -1,5 +1,6 @@
 package judgeServer.domain.solve.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,7 +8,7 @@ import java.time.LocalDateTime;
 
 /** 정답 기록. 같은 팀이 같은 문제를 두 번 맞히는 것은 DB 유니크 키(challenge_id, team_id)로 막는다. */
 @Entity
-@Table(name = "solves")
+@Table(name = TableNames.solvesTable)
 @Builder
 @Getter @NoArgsConstructor @AllArgsConstructor
 public class Solve {

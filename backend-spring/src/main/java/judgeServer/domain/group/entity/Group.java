@@ -1,7 +1,9 @@
 package judgeServer.domain.group.entity;
 
 import com.nimda.cite.common.entity.BaseTimeEntity;
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
+import judgeServer.domain.group.enums.GroupType;
 import judgeServer.domain.groupMember.entity.GroupMember;
 import lombok.*;
 
@@ -11,7 +13,7 @@ import java.util.List;
 
 @Getter
 @Entity
-@Table(name = "`groups`")
+@Table(name = TableNames.groupsTable)
 /*
 , uniqueConstraints = {
         @UniqueConstraint(name = "uk_group_activity_name", columnNames = {"activity_id", "name"})
@@ -43,6 +45,11 @@ public class Group extends BaseTimeEntity {
     @Column(length = 200)
     private String description;
 
+    /** 스터디 그룹인지 CTF 팀인지. 두 API가 서로의 행을 건드리지 않게 가른다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "group_type", nullable = false, length = 20)
+    private GroupType type;
+
     /** 이 팀이 참가하는 대회(ctf_contests.id). 팀 이름 중복·한 사람 한 팀은 대회 안에서만 따진다. */
     @Column(name = "contest_id")
     private Long contestId;
@@ -52,11 +59,21 @@ public class Group extends BaseTimeEntity {
 
     // 임시
     @Builder
-    private Group(String name, Integer capacity, String description, Long contestId) {
+    private Group(String name, Integer capacity, String description, Long contestId, GroupType type) {
         this.name = name;
         this.capacity = capacity;
         this.description = description;
         this.contestId = contestId;
+        // 기존 행의 기본값(V39)과 맞춘다. 스터디 그룹은 GroupService가 STUDY를 넘긴다.
+        this.type = type != null ? type : GroupType.CTF_TEAM;
+    }
+
+    public boolean isStudy() {
+        return type == GroupType.STUDY;
+    }
+
+    public boolean isCtfTeam() {
+        return type == GroupType.CTF_TEAM;
     }
 
     /*

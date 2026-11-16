@@ -1,17 +1,19 @@
 package judgeServer.domain.group.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
 import judgeServer.domain.group.dto.GroupCreateRequest;
 import judgeServer.domain.group.dto.GroupDetailResponse;
 import judgeServer.domain.group.dto.GroupListResponse;
 import judgeServer.domain.group.dto.GroupUpdateRequest;
 import judgeServer.domain.group.entity.Group;
+import judgeServer.domain.group.enums.GroupType;
 import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.service.GroupMemberService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,20 +21,18 @@ import java.util.List;
 
 
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GroupService {
 
-    @Autowired
-    private GroupRepository groupRepository;
+    private final GroupRepository groupRepository;
 
     // @Autowired
     // private ActivityRepository activityRepository;
 
-    @Autowired
-    private GroupMemberService groupMemberService;
+    private final GroupMemberService groupMemberService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
 
     @Transactional
@@ -44,6 +44,7 @@ public class GroupService {
                 .name(request.getName())
                 .capacity(request.getCapacity())
                 .description(request.getDescription())
+                .type(GroupType.STUDY)
                 .build();
         groupRepository.save(group);
 
@@ -55,8 +56,7 @@ public class GroupService {
 
     @Transactional
     public void updateGroup(Long groupId, Long userId, GroupUpdateRequest request) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+        Group group = getStudyGroup(groupId);
         validateLeader(groupId, userId);
         validateUniqueName(request.getName(), groupId);
 
@@ -65,34 +65,39 @@ public class GroupService {
 
     @Transactional
     public void deleteGroup(Long groupId, Long userId) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+        Group group = getStudyGroup(groupId);
         validateLeader(groupId, userId);
 
         groupRepository.delete(group); // cascade로 GroupMember 함께 삭제
     }
 
     public GroupDetailResponse getGroup(Long groupId) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+        Group group = getStudyGroup(groupId);
         return GroupDetailResponse.from(group);
     }
 
     public List<GroupListResponse> searchGroups(String keyword) {
-        return groupRepository.findByNameContainingWithMembers(keyword).stream()
+        return groupRepository.findByNameContainingWithMembers(keyword, GroupType.STUDY).stream()
                 .map(GroupListResponse::from)
                 .toList();
     }
 
     public List<GroupListResponse> getAllGroups() {
-        return groupRepository.findAllWithMembers().stream()
+        return groupRepository.findAllWithMembers(GroupType.STUDY).stream()
                 .map(GroupListResponse::from)
                 .toList();
     }
 
+    // CTF 팀도 groups 테이블에 있다. 스터디 그룹 API로는 CTF 팀을 보거나 바꾸지 못하게 없는 그룹으로 본다.
+    private Group getStudyGroup(Long groupId) {
+        return groupRepository.findById(groupId)
+                .filter(Group::isStudy)
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND));
     }
 
     private void validateLeader(Long groupId, Long userId) {
@@ -102,10 +107,10 @@ public class GroupService {
     // excludeGroupId가 null이면 생성 시 체크, 값이 있으면 본인 그룹은 제외하고 수정 시 체크
     private void validateUniqueName(String name, Long excludeGroupId) {
         boolean duplicated = (excludeGroupId == null)
-                ? groupRepository.existsByName(name)
-                : groupRepository.existsByNameAndIdNot(name, excludeGroupId);
+                ? groupRepository.existsByNameAndType(name, GroupType.STUDY)
+                : groupRepository.existsByNameAndTypeAndIdNot(name, GroupType.STUDY, excludeGroupId);
         if (duplicated) {
-            throw new IllegalStateException("이미 사용 중인 그룹 이름입니다.");
+            throw new GlobalNimdaException(ErrorCode.GROUP_NAME_DUPLICATED);
         }
     }
 

@@ -1,5 +1,7 @@
 package judgeServer.domain.contest.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.domain.contest.dto.ContestSaveRequest;
 import judgeServer.domain.contest.entity.Contest;
 import judgeServer.domain.contest.entity.ContestChangeLog;
@@ -13,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -68,9 +69,10 @@ class ContestServiceTest {
 
     @Test
     void endBeforeStartIsRejected() {
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.create(request(null, END, START), 1L));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.INVALID_CONTEST_RANGE, e.getErrorCode());
         verify(contestRepository, never()).save(any());
     }
 
@@ -100,9 +102,10 @@ class ContestServiceTest {
     void cannotCreateWhileLatestContestIsNotFinalized() {
         currentIs(contest(1L, START, END, null));
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.create(request("NIMDACON 2027", START.plusYears(1), END.plusYears(1)), 1L));
-        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.UNFINALIZED_CONTEST_EXISTS, e.getErrorCode());
     }
 
     @Test
@@ -167,9 +170,10 @@ class ContestServiceTest {
     void manualFinalizeRejectsRunningContest() {
         currentIs(contest(1L, START, END, null));
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.finalizeContest(1L, 1L));
-        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.CONTEST_NOT_ENDED, e.getErrorCode());
         assertTrue(snapshotService.calls.isEmpty());
     }
 

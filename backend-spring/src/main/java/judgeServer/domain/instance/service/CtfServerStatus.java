@@ -1,4 +1,4 @@
-package judgeServer.domain.instance.Service;
+package judgeServer.domain.instance.service;
 
 import judgeServer.config.CtfQueueProperties;
 import lombok.RequiredArgsConstructor;

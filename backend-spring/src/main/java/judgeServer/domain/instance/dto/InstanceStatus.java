@@ -1,5 +1,6 @@
-package judgeServer.domain.instance.ObjectStatus;
+package judgeServer.domain.instance.dto;
 
+import judgeServer.domain.instance.enums.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

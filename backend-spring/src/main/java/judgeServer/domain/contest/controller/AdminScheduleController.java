@@ -1,6 +1,7 @@
 package judgeServer.domain.contest.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import judgeServer.domain.contest.dto.ContestSaveRequest;
@@ -24,19 +25,19 @@ import org.springframework.web.bind.annotation.*;
  * <p>"지금 종료"·"+30분" 같은 빠른 조정은 프론트가 endsAt을 계산해 PUT으로 보낸다.
  */
 @RestController
-@RequestMapping("/api/admin/ctf/schedule")
+@RequestMapping(UrlNames.adminScheduleUrl)
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminScheduleController {
 
     private final ContestService contestService;
 
-    @GetMapping
+    @GetMapping(UrlNames.getAdminScheduleUrl)
     public ResponseEntity<?> schedule() {
         return ApiResponse.ok(contestService.getAdminSchedule()).toResponse();
     }
 
-    @PutMapping
+    @PutMapping(UrlNames.updateScheduleUrl)
     public ResponseEntity<?> update(@Valid @RequestBody ContestSaveRequest request,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         return ApiResponse.ok("대회 일정이 저장되었습니다.",

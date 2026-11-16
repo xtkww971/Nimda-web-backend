@@ -1,9 +1,9 @@
-package judgeServer.domain.instance.Repository;
+package judgeServer.domain.instance.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import judgeServer.config.CtfTtlProperties;
-import judgeServer.domain.instance.ObjectStatus.InstanceStatus;
+import judgeServer.domain.instance.dto.InstanceStatus;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import redis.util.RedisUtil;

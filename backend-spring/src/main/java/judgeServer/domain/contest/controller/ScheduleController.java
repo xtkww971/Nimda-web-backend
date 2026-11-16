@@ -1,6 +1,7 @@
 package judgeServer.domain.contest.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import judgeServer.domain.contest.service.ContestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>status: NOT_SCHEDULED / UPCOMING / RUNNING / ENDED. 남은 시간은 serverTime 기준으로 계산한다.
  */
 @RestController
-@RequestMapping("/api/ctf/schedule")
+@RequestMapping(UrlNames.scheduleUrl)
 @RequiredArgsConstructor
 public class ScheduleController {
 
     private final ContestService contestService;
 
-    @GetMapping
+    @GetMapping(UrlNames.getScheduleUrl)
     public ResponseEntity<?> schedule() {
         return ApiResponse.ok(contestService.getSchedule()).toResponse();
     }

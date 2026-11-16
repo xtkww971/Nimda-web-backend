@@ -1,6 +1,7 @@
 package judgeServer.domain.groupJoinRequest.entity;
 
 import com.nimda.cite.common.entity.BaseTimeEntity;
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.*;
 import judgeServer.domain.group.entity.Group;
@@ -13,7 +14,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "group_join_requests", uniqueConstraints = {
+@Table(name = TableNames.groupJoinRequestsTable, uniqueConstraints = {
         @UniqueConstraint(name = "uk_group_join_request", columnNames = {"group_id", "user_id"})
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

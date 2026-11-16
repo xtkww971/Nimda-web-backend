@@ -1,21 +1,23 @@
-package judgeServer.domain.instance.Contoller;
+package judgeServer.domain.instance.controller;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.UnauthorizedException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import judgeServer.domain.challenge.entity.Challenge;
-import judgeServer.domain.group.service.CtfTeamResolver;
-import judgeServer.domain.contest.service.ContestService;
-import judgeServer.domain.instance.Service.CtfServerStatus;
-import judgeServer.domain.instance.Service.InstanceService;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.contest.service.ContestService;
+import judgeServer.domain.group.service.CtfTeamResolver;
+import judgeServer.domain.instance.service.CtfServerStatus;
+import judgeServer.domain.instance.service.InstanceService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -34,7 +36,7 @@ import java.util.Map;
  * 실제 접속은 응답의 accessUrl(inst-{uuid}.{도메인})로 하고, SubdomainInstanceProxyFilter가 컨테이너로 넘긴다.
  */
 @RestController
-@RequestMapping("/api/ctf/instance")
+@RequestMapping(UrlNames.instanceUrl)
 @RequiredArgsConstructor
 public class InstanceController {
 
@@ -45,7 +47,7 @@ public class InstanceController {
     private final ContestService contestService;
 
     // 컨테이너 생성 요청
-    @PostMapping("/{code}")
+    @PostMapping(UrlNames.createInstanceUrl)
     public ResponseEntity<?> create(@PathVariable String code,
                                     @AuthenticationPrincipal CustomUserDetails user,
                                     HttpServletRequest request) {
@@ -54,19 +56,19 @@ public class InstanceController {
 
         // WEB·PWN만 인스턴스를 띄운다. Judge의 분류(instanceCategories)와 같은 기준이다.
         if (!challenge.getCategory().usesInstance()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 문제는 인스턴스 기능을 지원하지 않습니다.");
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_NOT_SUPPORTED);
         }
 
         // 버튼을 숨기는 것만으로는 API 직접 호출을 못 막는다. 꺼진 서버로 보낸 요청은 아무도 안 읽어서
         // PENDING에 멈추므로, 넣기 전에 거절한다 (CTF 레포 ADR-0022).
         if (!serverStatus.isAvailable()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "CTF 서버가 아직 작동중이지 않습니다.");
+            throw new GlobalNimdaException(ErrorCode.CTF_SERVER_UNAVAILABLE);
         }
 
         String uuid = instanceService.createInstance(challenge, userId);
         if (uuid == null) {
             // WEB·PWN인데 isolationType이 NONE인 경우. 문제 설정이 잘못된 것이다.
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 문제는 인스턴스 기능을 지원하지 않습니다.");
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_NOT_SUPPORTED);
         }
         return ApiResponse.ok(view(uuid, request)).toResponse();
     }
@@ -80,7 +82,7 @@ public class InstanceController {
      *   <li>있음 → {@code hasInstance:true} + 상태(PENDING/READY/FAILED/EXPIRED)</li>
      * </ul>
      */
-    @GetMapping("/{code}")
+    @GetMapping(UrlNames.getMyInstanceUrl)
     public ResponseEntity<?> myInstance(@PathVariable String code,
                                         @AuthenticationPrincipal CustomUserDetails user,
                                         HttpServletRequest request) {
@@ -98,13 +100,13 @@ public class InstanceController {
     }
 
     // 인스턴스 상태 조회 api (생성 직후 폴링)
-    @GetMapping("/status/{uuid}")
+    @GetMapping(UrlNames.getInstanceStatusUrl)
     public ResponseEntity<?> status(@PathVariable String uuid,
                                     @AuthenticationPrincipal CustomUserDetails user,
                                     HttpServletRequest request) {
         // 결과가 아직 없어도(PENDING) 소유자부터 확인한다. uuid만 알면 남의 상태를 볼 수 있으면 안 된다.
         if (!instanceService.isOwner(uuid, currentUserId(user))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 인스턴스가 아닙니다.");
+            throw new GlobalNimdaException(ErrorCode.INSTANCE_FORBIDDEN);
         }
         return ApiResponse.ok(view(uuid, request)).toResponse();
     }
@@ -121,16 +123,16 @@ public class InstanceController {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         return challenge;
     }
 
     private Long currentUserId(CustomUserDetails user) {
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new UnauthorizedException(ErrorCode.CANNOT_AUTHORIZED);
         }
         return user.getUser().getId();
     }

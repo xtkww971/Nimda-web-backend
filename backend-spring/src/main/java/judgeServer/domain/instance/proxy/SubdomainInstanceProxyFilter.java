@@ -1,4 +1,4 @@
-package judgeServer.domain.instance.Proxy;
+package judgeServer.domain.instance.proxy;
 
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.FilterChain;
@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import judgeServer.domain.challenge.enums.ChallengeCategory;
 import judgeServer.config.InstanceProperties;
-import judgeServer.domain.instance.Repository.InstanceResultStore;
+import judgeServer.domain.instance.repository.InstanceResultStore;
 import redis.mq.message.CtfResultMessage;
 import redis.mq.producer.RedisCtfRequestProducer;
 import redis.mq.message.RequestStatus;

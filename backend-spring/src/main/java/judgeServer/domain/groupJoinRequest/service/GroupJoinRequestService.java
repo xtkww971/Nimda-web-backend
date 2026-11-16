@@ -1,8 +1,9 @@
 package judgeServer.domain.groupJoinRequest.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
 import judgeServer.domain.group.entity.Group;
 import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupJoinRequest.dto.GroupJoinRequestResponse;
@@ -13,41 +14,36 @@ import judgeServer.domain.groupJoinRequest.repository.GroupJoinRequestRepository
 import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
 import judgeServer.domain.groupMember.service.GroupMemberService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.AccessDeniedException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GroupJoinRequestService {
 
-    @Autowired
-    private GroupJoinRequestRepository joinRequestRepository;
+    private final GroupJoinRequestRepository joinRequestRepository;
 
-    @Autowired
-    private GroupRepository groupRepository;
+    private final GroupRepository groupRepository;
 
     // @Autowired
     // private ActivityRepository activityRepository;
 
-    @Autowired
-    private GroupMemberRepository memberRepository;
+    private final GroupMemberRepository memberRepository;
 
-    @Autowired
-    private GroupMemberService groupMemberService;
+    private final GroupMemberService groupMemberService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public Long applyToGroup(Long groupId, Long userId) {
+        Group group = getGroup(groupId);
         validateNotAlreadyMember(groupId, userId);
         validateNoPendingRequest(groupId, userId);
 
-        Group group = getGroup(groupId);
         User user = getUser(userId);
 
         GroupJoinRequest request = GroupJoinRequest.builder()
@@ -63,11 +59,11 @@ public class GroupJoinRequestService {
     // 그룹장이 특정 사용자를 초대
     @Transactional
     public Long inviteToGroup(Long groupId, Long inviterId, Long inviteeId) {
+        Group group = getGroup(groupId);
         validateLeader(groupId, inviterId);
         validateNotAlreadyMember(groupId, inviteeId);
         validateNoPendingRequest(groupId, inviteeId);
 
-        Group group = getGroup(groupId);
         User invitee = getUser(inviteeId);
 
         GroupJoinRequest request = GroupJoinRequest.builder()
@@ -89,7 +85,8 @@ public class GroupJoinRequestService {
 
         // 정원 확인 시 락을 사용해 동시성 문제를 방지하게 설정
         Group group = groupRepository.findByIdForUpdate(request.getGroup().getId())
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+                .filter(Group::isStudy)
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND));
         validateCapacity(group);
 
         request.updateStatus(JoinRequestStatus.ACCEPTED);
@@ -112,7 +109,7 @@ public class GroupJoinRequestService {
     public void cancel(Long requestId, Long userId) {
         GroupJoinRequest request = getRequest(requestId);
         if (!request.getUser().getId().equals(userId)) {
-            throw new AccessDeniedException("본인의 요청만 취소할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.JOIN_REQUEST_CANCEL_FORBIDDEN);
         }
         validatePending(request);
 
@@ -121,6 +118,7 @@ public class GroupJoinRequestService {
 
     // 그룹장만 대기 중인 신청/초대 목록을 볼 수 있음
     public List<GroupJoinRequestResponse> getPendingRequestsOfGroup(Long groupId, Long requesterId) {
+        getGroup(groupId);
         validateLeader(groupId, requesterId);
 
         return joinRequestRepository.findByGroupIdAndStatus(groupId, JoinRequestStatus.PENDING)
@@ -141,36 +139,36 @@ public class GroupJoinRequestService {
         boolean isGroupLeader = groupMemberService.isLeader(request.getGroup().getId(), actorId);
 
         if (request.getJoinType() == JoinType.APPLY && !isGroupLeader) {
-            throw new AccessDeniedException("그룹장만 신청을 수락/거절할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.JOIN_REQUEST_APPLY_LEADER_ONLY);
         }
         if (request.getJoinType() == JoinType.INVITE && !isTargetUser) {
-            throw new AccessDeniedException("초대받은 본인만 수락/거절할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.JOIN_REQUEST_INVITEE_ONLY);
         }
     }
 
     private void validatePending(GroupJoinRequest request) {
         if (request.getStatus() != JoinRequestStatus.PENDING) {
-            throw new IllegalStateException("이미 처리된 요청입니다.");
+            throw new GlobalNimdaException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
         }
     }
 
     private void validateNotAlreadyMember(Long groupId, Long userId) {
         if (memberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new IllegalStateException("이미 그룹에 가입되어 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.ALREADY_GROUP_MEMBER);
         }
     }
 
     private void validateNoPendingRequest(Long groupId, Long userId) {
         if (joinRequestRepository.existsByGroupIdAndUserIdAndStatus(
                 groupId, userId, JoinRequestStatus.PENDING)) {
-            throw new IllegalStateException("이미 진행 중인 요청이 존재합니다.");
+            throw new GlobalNimdaException(ErrorCode.JOIN_REQUEST_ALREADY_PENDING);
         }
     }
 
     private void validateCapacity(Group group) {
         long currentCount = memberRepository.countByGroupId(group.getId());
         if (currentCount >= group.getCapacity()) {
-            throw new IllegalStateException("그룹 정원이 초과되었습니다.");
+            throw new GlobalNimdaException(ErrorCode.GROUP_CAPACITY_EXCEEDED);
         }
     }
 
@@ -178,19 +176,21 @@ public class GroupJoinRequestService {
         groupMemberService.validateLeader(groupId, userId);
     }
 
+    // CTF 팀은 가입 신청·초대로 멤버를 바꾸지 않는다 (운영자 팀 빌딩만).
     private Group getGroup(Long groupId) {
         return groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 그룹입니다."));
+                .filter(Group::isStudy)
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND));
     }
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.USER_NOT_FOUND));
     }
 
     private GroupJoinRequest getRequest(Long requestId) {
         return joinRequestRepository.findById(requestId)
-                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 요청입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
     }
 
 }

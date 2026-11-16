@@ -1,27 +1,30 @@
 package judgeServer.domain.groupMember.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
-import jakarta.persistence.EntityNotFoundException;
 import judgeServer.domain.group.entity.Group;
+import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupMember.dto.GroupMemberResponse;
 import judgeServer.domain.groupMember.entity.GroupMember;
 import judgeServer.domain.groupMember.enums.MemberRole;
 import judgeServer.domain.groupMember.repository.GroupMemberRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.AccessDeniedException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GroupMemberService {
 
-    @Autowired
-    private GroupMemberRepository memberRepository;
+    private final GroupMemberRepository memberRepository;
+    private final GroupRepository groupRepository;
 
     public List<GroupMemberResponse> getMembers(Long groupId) {
+        requireStudyGroup(groupId);
         return memberRepository.findByGroupId(groupId).stream()
                 .map(GroupMemberResponse::from)
                 .toList();
@@ -31,7 +34,7 @@ public class GroupMemberService {
     @Transactional
     public GroupMember addMember(Group group, User user, MemberRole role) {
         if (memberRepository.existsByGroupIdAndUserId(group.getId(), user.getId())) {
-            throw new IllegalStateException("이미 그룹에 가입되어 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.ALREADY_GROUP_MEMBER);
         }
         GroupMember member = GroupMember.builder()
                 .group(group)
@@ -45,11 +48,11 @@ public class GroupMemberService {
     @Transactional
     public void transferLeadership(Long groupId, Long currentLeaderId, Long newLeaderId) {
         if (currentLeaderId.equals(newLeaderId)) {
-            throw new IllegalArgumentException("본인에게 위임할 수 없습니다.");
+            throw new GlobalNimdaException(ErrorCode.LEADER_TRANSFER_TO_SELF);
         }
         GroupMember currentLeader = getMember(groupId, currentLeaderId);
         if (currentLeader.getRole() != MemberRole.LEADER) {
-            throw new AccessDeniedException("그룹장만 위임할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.LEADER_TRANSFER_FORBIDDEN);
         }
         GroupMember newLeader = getMember(groupId, newLeaderId);
 
@@ -62,7 +65,7 @@ public class GroupMemberService {
     public void leave(Long groupId, Long userId) {
         GroupMember member = getMember(groupId, userId);
         if (member.getRole() == MemberRole.LEADER) {
-            throw new IllegalStateException("그룹장은 위임 후 탈퇴할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.LEADER_CANNOT_LEAVE);
         }
         memberRepository.delete(member);
     }
@@ -72,15 +75,24 @@ public class GroupMemberService {
     public void kick(Long groupId, Long leaderId, Long targetUserId) {
         validateLeader(groupId, leaderId);
         if (leaderId.equals(targetUserId)) {
-            throw new IllegalArgumentException("본인을 강퇴할 수 없습니다.");
+            throw new GlobalNimdaException(ErrorCode.CANNOT_KICK_SELF);
         }
         GroupMember target = getMember(groupId, targetUserId);
         memberRepository.delete(target);
     }
 
+    // CTF 팀도 groups 테이블에 있다. 팀 멤버는 운영자 팀 빌딩으로만 바꾸므로,
+    // 스터디 그룹 API(탈퇴·강퇴·위임·그룹장 확인)에서는 CTF 팀 멤버를 없는 것으로 본다.
+    private void requireStudyGroup(Long groupId) {
+        if (!groupRepository.findById(groupId).map(Group::isStudy).orElse(false)) {
+            throw new GlobalNimdaException(ErrorCode.GROUP_NOT_FOUND);
+        }
+    }
+
     private GroupMember getMember(Long groupId, Long userId) {
         return memberRepository.findByGroupIdAndUserId(groupId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("그룹 멤버가 아닙니다."));
+                .filter(member -> member.getGroup().isStudy())
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
     }
 
     // 그룹장 여부 확인 (예외를 던지지 않는 단순 조회용, 예: 신청/초대 처리 권한 판단)
@@ -97,7 +109,7 @@ public class GroupMemberService {
     public GroupMember validateLeader(Long groupId, Long userId) {
         GroupMember member = getMember(groupId, userId);
         if (member.getRole() != MemberRole.LEADER) {
-            throw new AccessDeniedException("그룹장만 수행할 수 있습니다.");
+            throw new GlobalNimdaException(ErrorCode.GROUP_LEADER_ONLY);
         }
         return member;
     }

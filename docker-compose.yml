@@ -12,8 +12,16 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      # 메모리 설정 최적화 (1GB RAM 환경)
-      MYSQL_INNODB_BUFFER_POOL_SIZE: 256M
+    # 메모리 설정 (1GB RAM 서버). mysql 이미지는 서버 설정을 환경변수로 받지 않으므로 command로 넘긴다.
+    # 2026-11 실측: 데이터 3.4MB, 최대 동시 연결 9개, performance_schema가 혼자 230MiB를 써서 MySQL이 약 430MB(대부분 스왑)를 차지했다.
+    # 로컬 검증: 같은 데이터와 부하에서 RSS 418MB → 162MB, 쿼리 처리 시간 차이 3% 이내.
+    command:
+      - --performance-schema=OFF          # 230MiB 절약. 쿼리 분석이 필요하면 슬로우 쿼리 로그를 쓴다
+      - --innodb-buffer-pool-size=64M     # 데이터 대비 충분 (기본 128M 중 24MB만 쓰고 있었다)
+      - --innodb-log-buffer-size=8M       # 기본 16M
+      - --max-connections=40              # 기본 151. Hikari 풀 5개 × blue/green 2개 + 여유
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
     expose:
       - "3306" # DB 외부 접근 차단
     volumes:

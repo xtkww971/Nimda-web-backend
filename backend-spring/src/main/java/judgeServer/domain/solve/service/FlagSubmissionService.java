@@ -1,14 +1,14 @@
 package judgeServer.domain.solve.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.util.FlagHasher;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.util.Map;
@@ -89,7 +89,7 @@ public class FlagSubmissionService {
             redisTemplate.expire(key, RATE_WINDOW);
         }
         if (attempts != null && attempts > MAX_ATTEMPTS_PER_WINDOW) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "제출이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
+            throw new GlobalNimdaException(ErrorCode.TOO_MANY_SUBMISSIONS);
         }
     }
 
@@ -115,7 +115,7 @@ public class FlagSubmissionService {
             return Optional.empty();
         }
         if (!String.valueOf(userId).equals(fields.get("userId"))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인의 제출이 아닙니다.");
+            throw new GlobalNimdaException(ErrorCode.SUBMISSION_FORBIDDEN);
         }
         return Optional.of(new SubmissionVerdict(
                 SubmissionVerdict.Status.valueOf((String) fields.get("status")),

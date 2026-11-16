@@ -3,7 +3,7 @@ package redis.mq.consumer;
 import judgeServer.config.CtfQueueProperties;
 import judgeServer.config.CtfTtlProperties;
 import judgeServer.domain.challenge.download.ChallengeDownloadUrlCache;
-import judgeServer.domain.instance.Repository.InstanceResultStore;
+import judgeServer.domain.instance.repository.InstanceResultStore;
 import redis.mq.message.CtfResultMessage;
 import redis.mq.message.RequestStatus;
 import redis.mq.producer.RedisCtfRequestProducer;

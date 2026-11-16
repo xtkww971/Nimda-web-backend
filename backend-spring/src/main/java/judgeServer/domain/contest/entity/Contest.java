@@ -1,5 +1,6 @@
 package judgeServer.domain.contest.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import jakarta.persistence.*;
 import judgeServer.domain.contest.enums.ContestPhase;
 import lombok.*;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
  * 가장 최근에 시작하는 대회가 "현재 대회"이고, 팀·정답 기록은 현재 대회에 묶인다.
  */
 @Entity
-@Table(name = "ctf_contests")
+@Table(name = TableNames.ctfContestsTable)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)

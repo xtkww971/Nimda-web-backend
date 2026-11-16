@@ -1,6 +1,7 @@
 package judgeServer.domain.challenge.controller;
 
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import jakarta.validation.Valid;
 import judgeServer.domain.challenge.dto.AddChallengeRequest;
 import judgeServer.domain.challenge.entity.Challenge;
@@ -12,14 +13,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/ctf/challenge")
+@RequestMapping(UrlNames.challengeUrl)
 @RequiredArgsConstructor
 public class ChallengeController {
 
     private final ChallengeService challengeService;
 
     @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = UrlNames.createChallengeUrl, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createChallenge(@ModelAttribute @Valid AddChallengeRequest request) {
         Challenge challenge = challengeService.addChallenge(request);
 
@@ -28,13 +29,13 @@ public class ChallengeController {
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
-    @PostMapping("/toggle-public/{id}")
+    @PostMapping(UrlNames.toggleChallengePublicUrl)
     public ResponseEntity<?> toggleIsPublic(@PathVariable Long id) {
         return ApiResponse.ok(challengeService.toggleIsPublic(id)).toResponse();
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
-    @DeleteMapping("/{id}")
+    @DeleteMapping(UrlNames.deleteChallengeUrl)
     public ResponseEntity<?> deleteChallenge(@PathVariable Long id) {
         challengeService.deleteChallenge(id);
         return ApiResponse.ok("삭제가 완료되었습니다.").toResponse();

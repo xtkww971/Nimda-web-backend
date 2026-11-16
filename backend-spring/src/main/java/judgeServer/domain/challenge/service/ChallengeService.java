@@ -1,5 +1,7 @@
 package judgeServer.domain.challenge.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.domain.attachment.store.S3FileStore;
 import judgeServer.domain.challenge.dto.AddChallengeRequest;
 import judgeServer.domain.challenge.entity.Challenge;
@@ -10,10 +12,8 @@ import judgeServer.domain.challenge.util.FlagHasher;
 import judgeServer.domain.scoreboard.repository.CtfTeamScoreRepository;
 import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -39,8 +39,8 @@ public class ChallengeService {
     @Transactional
     public Challenge addChallenge(AddChallengeRequest request) {
         if (challengeRepository.existsByCode(request.getCode())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "이미 존재하는 문제 코드입니다: " + request.getCode());
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_CODE_DUPLICATED,
+                    ErrorCode.CHALLENGE_CODE_DUPLICATED.getMessage() + " (" + request.getCode() + ")");
         }
 
         FlagType flagType = request.getFlagType() != null ? request.getFlagType() : FlagType.STATIC;
@@ -53,16 +53,14 @@ public class ChallengeService {
         int minPoint = request.getMinPoint() != null ? request.getMinPoint() : DEFAULT_MIN_POINT;
         int decreasePoint = request.getDecreasePoint() != null ? request.getDecreasePoint() : DEFAULT_DECREASE_POINT;
         if (minPoint > maxPoint) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "최소 점수는 최대 점수보다 클 수 없습니다.");
+            throw new GlobalNimdaException(ErrorCode.INVALID_POINT_RANGE);
         }
 
         // DYNAMIC은 사용자마다 플래그가 달라 미리 저장할 값이 없다.
         String flagHash = null;
         if (flagType == FlagType.STATIC) {
             if (request.getFlag() == null || request.getFlag().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "STATIC 문제는 플래그가 필요합니다.");
+                throw new GlobalNimdaException(ErrorCode.STATIC_FLAG_REQUIRED);
             }
             flagHash = FlagHasher.hash(request.getFlag());
         }
@@ -108,8 +106,7 @@ public class ChallengeService {
     @Transactional
     public void deleteChallenge(Long id) {
         Challenge challenge = challengeRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "삭제하려는 문제가 존재하지 않습니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         List<Long> solverTeamIds = solveRepository.findTeamIdsByChallengeId(id);
         solveRepository.deleteByChallengeId(id);
@@ -123,8 +120,7 @@ public class ChallengeService {
     @Transactional
     public boolean toggleIsPublic(Long id) {
         Challenge challenge = challengeRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "존재하지 않는 문제입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         challenge.setIsPublic(!challenge.getIsPublic());
         return challenge.getIsPublic();

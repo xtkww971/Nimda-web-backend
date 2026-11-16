@@ -1,5 +1,6 @@
 package judgeServer.domain.groupMember.entity;
 
+import com.nimda.cite.common.util.TableNames;
 import com.nimda.cite.domain.comment.entity.BaseTime;
 import com.nimda.cite.user.entity.User;
 import jakarta.persistence.*;
@@ -8,7 +9,7 @@ import judgeServer.domain.groupMember.enums.MemberRole;
 import lombok.*;
 
 @Entity
-@Table(name = "group_members", uniqueConstraints = {
+@Table(name = TableNames.groupMembersTable, uniqueConstraints = {
         @UniqueConstraint(name = "uk_group_member", columnNames = {"group_id", "user_id"})
 })
 @Getter

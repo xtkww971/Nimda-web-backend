@@ -1,11 +1,13 @@
 package judgeServer.domain.group.service;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.user.entity.User;
 import com.nimda.cite.user.enums.ApprovalStatus;
 import com.nimda.cite.user.repository.UserRepository;
 import judgeServer.domain.contest.service.ContestService;
-import judgeServer.domain.group.dto.TeamResponse;
 import judgeServer.domain.group.dto.TeamCreateRequest;
+import judgeServer.domain.group.dto.TeamResponse;
 import judgeServer.domain.group.entity.Group;
 import judgeServer.domain.group.repository.GroupRepository;
 import judgeServer.domain.groupJoinRequest.repository.GroupJoinRequestRepository;
@@ -17,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -68,9 +69,10 @@ class AdminTeamServiceTest {
 
     @Test
     void createTeamRejectsMembersOverCapacity() {
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 1, 1L, List.of(2L))));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.TEAM_MEMBERS_OVER_CAPACITY, e.getErrorCode());
         verify(groupRepository, never()).save(any());
     }
 
@@ -82,9 +84,10 @@ class AdminTeamServiceTest {
         when(memberRepository.findInContestByUserIds(anyCollection(), eq(9L)))
                 .thenReturn(List.of(GroupMember.builder().group(other).user(a).role(MemberRole.MEMBER).build()));
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 4, null, List.of(1L))));
-        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.TEAM_USER_ALREADY_ASSIGNED, e.getErrorCode());
     }
 
     @Test
@@ -93,9 +96,10 @@ class AdminTeamServiceTest {
         pending.changeStatus(ApprovalStatus.PENDING);
         when(userRepository.findAllById(anyCollection())).thenReturn(List.of(pending));
 
-        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+        GlobalNimdaException e = assertThrows(GlobalNimdaException.class,
                 () -> service.createTeam(request("team", 4, null, List.of(1L))));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getErrorCode().getHttpStatus());
+        assertEquals(ErrorCode.TEAM_USER_NOT_APPROVED, e.getErrorCode());
     }
 
     private static TeamCreateRequest request(String name, int capacity, Long leaderId, List<Long> memberIds) {

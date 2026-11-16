@@ -1,9 +1,10 @@
 package judgeServer.domain.solve.controller;
 
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.validation.Valid;
-import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.solve.dto.SubmissionVerdict;
 import judgeServer.domain.solve.dto.SubmitFlagRequest;
 import judgeServer.domain.solve.service.FlagSubmissionService;
@@ -27,13 +28,13 @@ import java.util.Map;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/ctf/challenge")
+@RequestMapping(UrlNames.challengeUrl)
 @RequiredArgsConstructor
 public class FlagSubmissionController {
 
     private final FlagSubmissionService submissionService;
 
-    @PostMapping(value = "/{challengeId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = UrlNames.submitFlagUrl, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> submit(@PathVariable Long challengeId,
                                     @Valid @RequestBody SubmitFlagRequest request,
                                     @AuthenticationPrincipal CustomUserDetails user) {
@@ -43,7 +44,7 @@ public class FlagSubmissionController {
         return respond(submission, HttpStatus.ACCEPTED);
     }
 
-    @GetMapping("/submission/{submissionId}")
+    @GetMapping(UrlNames.getSubmissionResultUrl)
     public ResponseEntity<?> result(@PathVariable String submissionId,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         return respond(submissionService.find(submissionId, user.getUser().getId()), HttpStatus.OK);
@@ -70,7 +71,7 @@ public class FlagSubmissionController {
                 return ApiResponse.fail("대회가 종료되어 제출할 수 없습니다.").toResponse(HttpStatus.FORBIDDEN);
             }
             case NO_TEAM -> {
-                return ApiResponse.fail(CtfTeamResolver.NO_TEAM_MESSAGE).toResponse(HttpStatus.FORBIDDEN);
+                return ApiResponse.fail(ErrorCode.NO_TEAM.getMessage()).toResponse(ErrorCode.NO_TEAM.getHttpStatus());
             }
             case UNSUPPORTED -> {
                 return ApiResponse.fail("DYNAMIC 플래그 제출은 아직 지원하지 않습니다.").toResponse(HttpStatus.BAD_REQUEST);

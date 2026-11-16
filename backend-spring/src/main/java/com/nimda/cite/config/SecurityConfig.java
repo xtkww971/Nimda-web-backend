@@ -1,9 +1,9 @@
 package com.nimda.cite.config;
 
 import judgeServer.config.InstanceProperties;
-import judgeServer.domain.instance.Proxy.InstanceProxy;
-import judgeServer.domain.instance.Proxy.SubdomainInstanceProxyFilter;
-import judgeServer.domain.instance.Repository.InstanceResultStore;
+import judgeServer.domain.instance.proxy.InstanceProxy;
+import judgeServer.domain.instance.proxy.SubdomainInstanceProxyFilter;
+import judgeServer.domain.instance.repository.InstanceResultStore;
 import redis.mq.producer.RedisCtfRequestProducer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

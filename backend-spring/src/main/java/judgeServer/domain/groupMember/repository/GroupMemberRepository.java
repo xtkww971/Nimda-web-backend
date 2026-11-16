@@ -34,19 +34,19 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     Optional<GroupMember> findByGroupIdAndRole(Long groupId, MemberRole role);
 
     // 대회 안에서 이미 팀에 속한 멤버십 (CTF는 대회마다 한 사람이 한 팀에만 속한다)
-    @Query("select m from GroupMember m join fetch m.user join fetch m.group g where m.user.id in :userIds and (g.contestId = :contestId or (:contestId is null and g.contestId is null))")
+    @Query("select m from GroupMember m join fetch m.user join fetch m.group g where m.user.id in :userIds and g.type = judgeServer.domain.group.enums.GroupType.CTF_TEAM and (g.contestId = :contestId or (:contestId is null and g.contestId is null))")
     List<GroupMember> findInContestByUserIds(@Param("userIds") Collection<Long> userIds,
                                              @Param("contestId") Long contestId);
 
     // 대회 안에서 유저가 속한 팀 id
-    @Query("select g.id from GroupMember m join m.group g where m.user.id = :userId and (g.contestId = :contestId or (:contestId is null and g.contestId is null)) order by m.id asc")
+    @Query("select g.id from GroupMember m join m.group g where m.user.id = :userId and g.type = judgeServer.domain.group.enums.GroupType.CTF_TEAM and (g.contestId = :contestId or (:contestId is null and g.contestId is null)) order by m.id asc")
     List<Long> findGroupIdsByUserIdInContest(@Param("userId") Long userId, @Param("contestId") Long contestId);
 
     // 대회 안에서 아직 팀이 없는 승인된 유저 (운영자 팀 빌딩의 UNASSIGNED 목록)
     @Query("""
             select u from User u
             where u.status = com.nimda.cite.user.enums.ApprovalStatus.APPROVED
-              and not exists (select 1 from GroupMember m join m.group g where m.user = u and (g.contestId = :contestId or (:contestId is null and g.contestId is null)))
+              and not exists (select 1 from GroupMember m join m.group g where m.user = u and g.type = judgeServer.domain.group.enums.GroupType.CTF_TEAM and (g.contestId = :contestId or (:contestId is null and g.contestId is null)))
               and (:keyword is null
                    or lower(u.nickname) like lower(concat('%', :keyword, '%'))
                    or lower(u.userId) like lower(concat('%', :keyword, '%')))

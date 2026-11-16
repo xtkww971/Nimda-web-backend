@@ -1,21 +1,22 @@
 package judgeServer.domain.challenge.controller;
 
+import com.nimda.cite.common.exception.GlobalNimdaException;
+import com.nimda.cite.common.exception.errorcode.ErrorCode;
 import com.nimda.cite.common.response.ApiResponse;
+import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.challenge.dto.ChallengeDetailResponse;
 import judgeServer.domain.challenge.dto.ChallengeSummaryResponse;
 import judgeServer.domain.challenge.entity.Challenge;
 import judgeServer.domain.challenge.repository.ChallengeRepository;
-import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.contest.service.ContestService;
+import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.solve.repository.SolveRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -39,7 +40,7 @@ import java.util.stream.Collectors;
  * <p>팀전이라 팀에 소속되지 않은 참가자에게는 목록·상세 모두 403으로 답한다 (관리자·DEV 제외).
  */
 @RestController
-@RequestMapping("/api/ctf/challenges")
+@RequestMapping(UrlNames.challengesUrl)
 @RequiredArgsConstructor
 public class ChallengeQueryController {
 
@@ -49,7 +50,7 @@ public class ChallengeQueryController {
     private final ContestService contestService;
 
     /** 문제 목록. 관리자와 DEV는 초안까지 함께 본다. */
-    @GetMapping
+    @GetMapping(UrlNames.getChallengesUrl)
     public ResponseEntity<?> list(@AuthenticationPrincipal CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
@@ -68,16 +69,16 @@ public class ChallengeQueryController {
     }
 
     /** 문제 상세. */
-    @GetMapping("/{code}")
+    @GetMapping(UrlNames.getChallengeDetailUrl)
     public ResponseEntity<?> detail(@PathVariable String code,
                                     @AuthenticationPrincipal CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
         Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다."));
+                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canViewDrafts(user)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 문제입니다.");
+            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
         }
         return ApiResponse.ok(ChallengeDetailResponse.from(challenge,
                 solveRepository.countInContest(challenge.getId(), contestService.currentContestId().orElse(null)))).toResponse();
