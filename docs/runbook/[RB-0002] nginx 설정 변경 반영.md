@@ -51,7 +51,7 @@ docker run --rm --network nimda-network \
 docker restart nimda-nginx
 
 # 3) 확인: 컨테이너가 새 파일을 보는지, 사이트가 사는지
-diff <(md5sum < nginx/nginx.conf) <(docker exec nimda-nginx md5sum < /etc/nginx/nginx.conf) && echo 같음
+diff <(md5sum < nginx/nginx.conf) <(docker exec nimda-nginx sh -c 'md5sum < /etc/nginx/nginx.conf') && echo 같음
 curl -s -o /dev/null -w '%{http_code}\n' https://nimda.kr/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://api.nimda.kr/api/auth/me   # 401 (로그인 안 함)
 curl -s -o /dev/null -w '%{http_code}\n' https://game.nimda.kr/       # 503(게임 꺼짐) 또는 200
