@@ -31,3 +31,12 @@ auth:
 nimda:
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./.local/attachments}
+
+# 개발용 상세 로그 (운영 application.yml 에서 옮겨 옴)
+logging:
+  level:
+    com.nimda.cite.common.s3: DEBUG
+    org.springframework.boot.autoconfigure.condition: DEBUG # 컨디션 체크 확인용
+    com.nimda.cup: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

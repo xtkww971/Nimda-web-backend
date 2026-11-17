@@ -155,11 +155,10 @@ aws:
     allowed-image-types: jpg,jpeg,png,gif,webp # 허용 이미지 타입
     allowed-file-types: pdf,doc,docx,xls,xlsx,zip  # 허용된 파일 타입
 
+# 운영 기본값. 예전엔 org.hibernate.SQL: DEBUG 라 SQL 하나마다 여러 줄이 찍혀,
+# 몰리는 시간엔 시간당 10만 줄 넘게 나와 Docker 로그 한도(10MB × 3)가 7시간 만에 찼다.
+# 개발할 때 SQL 을 보려면 local 프로필(application-local.yml)을 쓴다.
+# 운영에서 잠깐 켜야 하면 환경변수로: LOGGING_LEVEL_ORG_HIBERNATE_SQL=DEBUG
 logging:
   level:
-    com.nimda.cite.common.s3: DEBUG
-    org.springframework.boot.autoconfigure.condition: DEBUG # 컨디션 체크 확인용
-    com.nimda.cup: DEBUG
     org.springframework.security: WARN
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

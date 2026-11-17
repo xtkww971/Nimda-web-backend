@@ -86,10 +86,15 @@ services:
     environment:
       # 시간대 설정
       - TZ=Asia/Seoul
-      # JVM 메모리 측정용 GC 로그 (힙 상한은 아직 기본값 그대로, 911MB의 1/4 ≈ 228MiB).
-      # GC 직후 힙(살아 있는 데이터)과 Metaspace 크기를 모아 -Xmx를 정한다. 보기: docker exec backend-blue tail /tmp/gc.log
-      # 서버의 Docker 로그는 크기 제한이 없어서 stdout 대신 컨테이너 안 파일에 5MB × 5개로 돌려 쓴다.
-      - JAVA_TOOL_OPTIONS=-Xlog:gc,gc+metaspace:file=/tmp/gc.log:time,uptime,level,tags:filecount=5,filesize=5M
+      # JVM 메모리 상한. 24시간 GC 로그 실측(2026-11-16~17): GC 직후 힙 최대 80MB, 잡아 둔 힙 최대 135MB,
+      # Metaspace 126MB, 스레드 41개. 상한이 없으면 힙이 911MB의 1/4(≈228MiB)까지 커질 수 있고,
+      # 실제로 Java 메모리 대부분이 스왑에 밀려 평소 Young GC 가 1.7초씩 멈췄다.
+      #   -Xmx160m                  실사용 최대(80MB)의 2배
+      #   MaxMetaspaceSize=192m     지금 126MB이고 조금씩 늘고 있어 여유를 둔다
+      #   ReservedCodeCacheSize=64m 기본 240MB 예약을 줄인다 (Spring Boot 는 보통 30~50MB 사용)
+      #   ExitOnOutOfMemoryError    OOM 이면 바로 죽고 restart: always 로 다시 뜬다 (반쯤 죽은 채 버티지 않게)
+      # GC 로그는 상한을 건 뒤에도 확인하려고 남긴다 (컨테이너 안 파일, 5MB × 5). 보기: docker exec backend-blue tail /tmp/gc.log
+      - JAVA_TOOL_OPTIONS=-Xmx160m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError -Xlog:gc,gc+metaspace:file=/tmp/gc.log:time,uptime,level,tags:filecount=5,filesize=5M
       # MySQL
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -123,6 +128,9 @@ services:
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
+    # 힙 160 + Metaspace 약 130 + 코드 캐시 약 50 + 스레드·GC·네이티브 약 60 ≈ 400MB.
+    # 넘으면 이 컨테이너만 죽고 다시 뜬다 (MySQL 이 대신 OOM 으로 죽지 않게).
+    mem_limit: 512m
     logging: *default-logging
 
   backend-green:
@@ -146,8 +154,8 @@ services:
       start_period: 30s
     environment:
       - TZ=Asia/Seoul
-      # JVM 메모리 측정용 GC 로그. backend-blue 의 설명 참고
-      - JAVA_TOOL_OPTIONS=-Xlog:gc,gc+metaspace:file=/tmp/gc.log:time,uptime,level,tags:filecount=5,filesize=5M
+      # JVM 메모리 상한 + GC 로그. backend-blue 의 설명 참고 (두 값은 항상 같게 둔다)
+      - JAVA_TOOL_OPTIONS=-Xmx160m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError -Xlog:gc,gc+metaspace:file=/tmp/gc.log:time,uptime,level,tags:filecount=5,filesize=5M
       # MySQL 연결 정보
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -181,6 +189,8 @@ services:
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
     restart: always
+    # backend-blue 의 설명 참고
+    mem_limit: 512m
     logging: *default-logging
 
   nginx:
