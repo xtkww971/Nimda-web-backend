@@ -1,0 +1,16 @@
+package com.nimda.ctfgame.dto;
+
+import java.time.LocalDateTime;
+
+/** 관리자 화면용: 숨긴 물건과 이야기까지 전부. 위치는 게임 objects.json 에 있다. */
+public record AdminGameItemResponse(
+        Long id,
+        String key,
+        String name,
+        String description,
+        String challengeCode,
+        String challengeTitle,
+        int sortOrder,
+        boolean visible,
+        LocalDateTime updatedAt) {
+}

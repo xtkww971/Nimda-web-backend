@@ -14,9 +14,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaAuditing
 @EnableAsync // 알림 비동기 방식으로 처리
 @SpringBootApplication(exclude = RedisRepositoriesAutoConfiguration.class)
-@ComponentScan(basePackages = {"com.nimda.cite", "judgeServer", "redis"})
-@EnableJpaRepositories(basePackages = {"com.nimda.cite", "judgeServer"})
-@EntityScan(basePackages = {"com.nimda.cite", "judgeServer"})
+// com.nimda.ctfgame: CTF 게임(game.nimda.kr) 이벤트용 코드. 이벤트를 정리할 때 세 곳에서 함께 뺀다 (com/nimda/ctfgame/package-info.java)
+@ComponentScan(basePackages = {"com.nimda.cite", "judgeServer", "redis", "com.nimda.ctfgame"})
+@EnableJpaRepositories(basePackages = {"com.nimda.cite", "judgeServer", "com.nimda.ctfgame"})
+@EntityScan(basePackages = {"com.nimda.cite", "judgeServer", "com.nimda.ctfgame"})
 public class NimdaCiteApplication {
     public static void main(String[] args) {
         // JVM은 이름 조회 결과를 기본 30초 캐시한다. CTF 인스턴스는 컨테이너 이름으로 프록시하는데,
