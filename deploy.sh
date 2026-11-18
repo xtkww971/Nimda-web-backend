@@ -97,15 +97,63 @@ echo "server backend-$TARGET_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
 
 # nginx도 compose 정의에 맞춘다(네트워크가 바뀌었으면 재생성되어 새 .inc를 읽는다). 그대로면 아무것도 안 한다.
 reconcile nginx nimda-nginx
-# CI가 보낸 nginx.conf를 검사한다. 실패하면(예: 인증서 파일 없음) reload하지 않아 기존 설정이 그대로 돈다.
-if ! docker exec nimda-nginx nginx -t; then
-    echo "❌ nginx 설정 검사 실패 — reload하지 않습니다. 트래픽은 $ACTIVE_COLOR 에 그대로 둡니다."
+
+# ── nginx 설정 반영 ──────────────────────────────────────────────
+# nginx.conf 는 "파일 하나"를 바인드 마운트한다. CI(scp)가 파일을 새로 만들어 바꾸면(새 inode) 떠 있는 컨테이너는
+# 예전 파일을 계속 보고, 그 안에서 하는 nginx -t 와 reload 도 예전 설정으로 돈다.
+# (2026-11-17: #34 의 game.nimda.kr 블록이 배포 "성공" 뒤에도 반영되지 않았다.) 그래서 규칙은:
+#   1) CI 가 올린 서버의 새 nginx.conf 를 임시 컨테이너(같은 마운트·망)로 검사한다. 실패하면 nginx 를 건드리지 않는다.
+#   2) 컨테이너가 보는 nginx.conf 와 내용이 다르면(= 설정이 바뀌었으면) nginx 를 restart 한다 (1~2초 끊김).
+#      같으면(= 설정 그대로, active-backend.inc 만 바뀜) reload 만 한다. (conf.d 는 폴더 마운트라 바로 보인다)
+# 손으로 nginx.conf 를 고칠 때도 같다: 고친 뒤 검사하고 restart (RUNBOOK 참고).
+NGINX_MOUNTS=(-v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$PWD/nginx/conf.d:/etc/nginx/conf.d:ro"
+              -v "$PWD/certbot/conf:/etc/letsencrypt:ro" -v "$PWD/certbot/www:/var/www/certbot:ro")
+
+nginx_failed() {
+    echo "❌ $1 — nginx 를 건드리지 않습니다. 트래픽은 $ACTIVE_COLOR 에 그대로 둡니다."
     echo "server backend-$ACTIVE_COLOR:8080;" > ./nginx/conf.d/active-backend.inc
     docker compose stop backend-$TARGET_COLOR
     exit 1
+}
+
+if ! docker run --rm --network "$APP_NETWORK" "${NGINX_MOUNTS[@]}" nginx:alpine nginx -t; then
+    nginx_failed "새 nginx.conf 검사 실패 (예: 인증서 파일 없음, 문법 오류)"
 fi
-# Nginx 프록시 서버 변경
-docker exec nimda-nginx nginx -s reload
+
+# nginx.conf 가 쓰는 인증서의 남은 날짜 (경고만, 배포는 막지 않는다). nginx -t 는 만료를 보지 않는다.
+# certbot 이미지에 든 python/cryptography 로 파일만 읽는다 (네트워크 없음, 읽기 전용)
+CERTBOT_IMAGE=$(docker image ls --format '{{.Repository}}:{{.Tag}}' certbot/certbot | head -1)
+CERT_NAMES=$(grep -oE "live/[^/]+/fullchain.pem" ./nginx/nginx.conf | cut -d/ -f2 | sort -u)
+if [ -n "$CERTBOT_IMAGE" ] && [ -n "$CERT_NAMES" ]; then
+    # shellcheck disable=SC2086
+    docker run --rm --network none --entrypoint python3 -v "$PWD/certbot/conf:/le:ro" "$CERTBOT_IMAGE" -c '
+import sys, datetime
+from cryptography import x509
+now = datetime.datetime.now(datetime.timezone.utc)
+for name in sys.argv[1:]:
+    cert = x509.load_pem_x509_certificate(open(f"/le/live/{name}/fullchain.pem", "rb").read())
+    left = (cert.not_valid_after_utc - now).days
+    mark = "❌ 만료" if left < 0 else ("⚠️  곧 만료" if left < 14 else "✅")
+    print(f"{mark} 인증서 {name}: {cert.not_valid_after_utc.date()} 까지 ({left}일)")
+' $CERT_NAMES || echo "⚠️  인증서 날짜를 읽지 못했습니다."
+fi
+
+host_conf=$(md5sum < ./nginx/nginx.conf | cut -d' ' -f1)
+live_conf=$(docker exec nimda-nginx md5sum /etc/nginx/nginx.conf | cut -d' ' -f1)
+if [ "$host_conf" != "$live_conf" ]; then
+    echo "📝 nginx.conf 가 바뀌어 nginx 를 다시 시작합니다 (새 파일을 읽도록)."
+    docker restart nimda-nginx >/dev/null
+    for retry in {1..10}; do
+        [ "$(docker inspect -f '{{.State.Running}}' nimda-nginx)" = "true" ] && break
+        sleep 1
+    done
+    if [ "$(docker exec nimda-nginx md5sum /etc/nginx/nginx.conf | cut -d' ' -f1)" != "$host_conf" ]; then
+        echo "⚠️  재시작 뒤에도 컨테이너가 새 nginx.conf 를 보지 않습니다. docker compose up -d --force-recreate nginx 로 확인하세요."
+    fi
+else
+    # Nginx 프록시 서버 변경 (설정은 그대로, active-backend.inc 만 바뀜)
+    docker exec nimda-nginx nginx -s reload
+fi
 echo "🔄 Nginx 트래픽을 backend-$TARGET_COLOR 로 전환했습니다."
 # 기존 서버 중단
 docker compose stop backend-$ACTIVE_COLOR
