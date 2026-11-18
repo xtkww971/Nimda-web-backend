@@ -15,6 +15,10 @@ services:
     networks:
       - nimda-network
     restart: always
+    # 컨테이너 메모리 한도. 넘으면 MySQL 만 다시 뜨고 다른 서비스는 그대로다 (예전엔 OOM 때 커널이 MySQL 을 골라 죽였다).
+    # 2026-11-18 실측(아래 설정 적용 뒤): 평소 RAM 25MB + 스왑 127MB, 최대 RAM 155MB.
+    # 설정상 상한(버퍼 풀 64M + 로그 버퍼 8M + 연결 40개분 버퍼)보다 넉넉하게 잡았다.
+    mem_limit: 256m
     logging: *default-logging
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -45,6 +49,9 @@ services:
     image: redis:7.0-alpine
     container_name: nimda-redis
     restart: always
+    # 실측: 평소 2MB, 최대 RAM 7MB. CTF 요청·결과 큐와 인스턴스 소유자 매핑이 있어 Redis maxmemory(넘치면 키를 지움)는
+    # 걸지 않고 컨테이너 한도만 둔다. 넘으면 Redis 만 다시 뜬다 (데이터는 redis_data 볼륨).
+    mem_limit: 64m
     logging: *default-logging
     command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
@@ -211,6 +218,8 @@ services:
       # blue - green의 주소가 담긴 설정 파일
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     restart: always
+    # 실측: 평소 4MB (워커 2개). 접속이 몰려도 연결당 수 KB 라 넉넉하다
+    mem_limit: 64m
     logging: *default-logging
 
 # 볼륨 정의 (데이터 영속성)
