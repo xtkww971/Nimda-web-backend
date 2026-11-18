@@ -166,6 +166,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
                         .requestMatchers(HttpMethod.DELETE, "/api/ctf/challenge/**").hasAnyRole("ADMIN", "DEV")
 
+                        // CTF 게임(game.nimda.kr) 물건 api (com.nimda.ctfgame, 이벤트용)
+                        // 관리는 문제 관리와 같은 ADMIN·DEV, 목록은 게임에 들어올 수 있는 역할 (게임 서버 MMO_ALLOWED_ROLES 와 같게)
+                        .requestMatchers("/api/ctf/game/admin/**").hasAnyRole("ADMIN", "DEV")
+                        .requestMatchers("/api/ctf/game/**").hasAnyRole("CTF_USER", "CTF_MASTER", "ADMIN", "DEV")
+
                         // [우선순위 7] 나머지 모든 요청은 기본적으로 인증 필요
                         .anyRequest().authenticated()
                 );

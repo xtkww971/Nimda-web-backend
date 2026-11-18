@@ -134,6 +134,8 @@ services:
       - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
+      # CTF 게임 물건 API(/api/ctf/game/**, 이벤트용). 이벤트가 끝나면 서버 .env 에 CTF_GAME_ENABLED=false
+      - CTF_GAME_ENABLED=${CTF_GAME_ENABLED:-true}
     restart: always
     # 힙 160 + Metaspace 약 130 + 코드 캐시 약 50 + 스레드·GC·네이티브 약 60 ≈ 400MB.
     # 넘으면 이 컨테이너만 죽고 다시 뜬다 (MySQL 이 대신 OOM 으로 죽지 않게).
@@ -195,6 +197,8 @@ services:
       - CTF_INSTANCE_GATEWAY=${CTF_INSTANCE_GATEWAY:-}
       # 인증 쿠키를 인스턴스 서브도메인에도 보내려면 상위 도메인을 건다. 비어 있으면 host-only.
       - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
+      # CTF 게임 물건 API(/api/ctf/game/**, 이벤트용). 이벤트가 끝나면 서버 .env 에 CTF_GAME_ENABLED=false
+      - CTF_GAME_ENABLED=${CTF_GAME_ENABLED:-true}
     restart: always
     # backend-blue 의 설명 참고
     mem_limit: 512m
