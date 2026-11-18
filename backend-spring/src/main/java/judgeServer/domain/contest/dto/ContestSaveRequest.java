@@ -31,9 +31,11 @@ public class ContestSaveRequest {
 
     private Boolean challengesVisibleAfterEnd;
 
+    /** 종료 전 순위 비공개 켜기 (화면 이름 "순위 비공개", 필드 이름은 예전 "스코어보드 고정" 그대로) */
     private Boolean freezeScoreboard;
 
-    @Min(value = 1, message = "고정 시점은 1분 이상이어야 합니다.")
-    @Max(value = 1440, message = "고정 시점은 24시간 이내여야 합니다.")
+    /** 순위 비공개 시작: 종료 몇 분 전 (1~600, 기본 120) */
+    @Min(value = 1, message = "순위 비공개는 종료 1분 전부터 정할 수 있습니다.")
+    @Max(value = 600, message = "순위 비공개는 종료 600분 전까지 정할 수 있습니다.")
     private Integer freezeMinutesBeforeEnd;
 }

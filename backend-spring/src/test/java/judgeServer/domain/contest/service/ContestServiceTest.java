@@ -65,6 +65,46 @@ class ContestServiceTest {
         assertEquals(ContestPhase.NOT_SCHEDULED, service.phaseAt(NOW));
         assertEquals(ContestPhase.NOT_SCHEDULED, service.getSchedule().status());
         assertNotNull(service.getSchedule().serverTime());
+        assertNull(service.getSchedule().scoreboardHiddenFrom());
+        assertFalse(service.getSchedule().scoreboardHidden());
+    }
+
+    @Test
+    void scoreboardIsHiddenFromNMinutesBeforeEndUntilEnd() {
+        Contest c = hiding(contest(1L, START, END, null), 120);
+        LocalDateTime from = END.minusMinutes(120);
+
+        assertEquals(Optional.of(from), ContestService.scoreboardHiddenFrom(c));
+        assertFalse(ContestService.isScoreboardHidden(c, from.minusNanos(1)), "비공개 직전까지는 보인다");
+        assertTrue(ContestService.isScoreboardHidden(c, from));
+        assertTrue(ContestService.isScoreboardHidden(c, END.minusNanos(1)));
+        assertFalse(ContestService.isScoreboardHidden(c, END), "종료와 함께 공개");
+    }
+
+    @Test
+    void scoreboardIsNeverHiddenWhenTurnedOff() {
+        Contest c = contest(1L, START, END, null);   // freezeScoreboard=false
+
+        assertTrue(ContestService.scoreboardHiddenFrom(c).isEmpty());
+        assertFalse(ContestService.isScoreboardHidden(c, END.minusMinutes(1)));
+    }
+
+    @Test
+    void scheduleTellsWhenRankingIsHidden() {
+        Contest c = hiding(contest(1L, START, END, null), 120);
+        currentIs(c);
+
+        at(END.minusMinutes(121));
+        assertEquals(ContestService.toKst(END.minusMinutes(120)), service.getSchedule().scoreboardHiddenFrom());
+        assertFalse(service.getSchedule().scoreboardHidden());
+        assertFalse(service.isScoreboardHiddenNow());
+
+        at(END.minusMinutes(5));
+        assertTrue(service.getSchedule().scoreboardHidden());
+        assertTrue(service.isScoreboardHiddenNow());
+
+        at(END.plusSeconds(1));
+        assertFalse(service.getSchedule().scoreboardHidden());
     }
 
     @Test
@@ -86,7 +126,7 @@ class ContestServiceTest {
         assertTrue(saved.getValue().getCleanupInstancesOnEnd());
         assertTrue(saved.getValue().getChallengesVisibleAfterEnd());
         assertFalse(saved.getValue().getFreezeScoreboard());
-        assertEquals(30, saved.getValue().getFreezeMinutesBeforeEnd());
+        assertEquals(120, saved.getValue().getFreezeMinutesBeforeEnd(), "순위 비공개 기본값은 종료 120분 전");
 
         // 대회 없이 만든 팀과 그 팀 정답 기록을 첫 대회로 편입한다
         verify(groupRepository).assignOrphansToContest(1L);
@@ -179,6 +219,13 @@ class ContestServiceTest {
 
     private void at(LocalDateTime time) {
         service.setClock(Clock.fixed(time.atZone(ContestService.KST).toInstant(), ContestService.KST));
+    }
+
+    /** 순위 비공개를 켠 대회 (종료 minutes 분 전부터) */
+    private static Contest hiding(Contest c, int minutes) {
+        ReflectionTestUtils.setField(c, "freezeScoreboard", true);
+        ReflectionTestUtils.setField(c, "freezeMinutesBeforeEnd", minutes);
+        return c;
     }
 
     private void currentIs(Contest c) {
