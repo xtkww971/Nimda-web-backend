@@ -7,14 +7,13 @@ import com.nimda.cite.common.response.ApiResponse;
 import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import judgeServer.domain.challenge.entity.Challenge;
-import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.challenge.exposure.ChallengeExposure;
 import judgeServer.domain.challenge.service.ChallengeRules;
 import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.service.CtfTeamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import redis.mq.message.CtfResultMessage;
@@ -35,12 +34,12 @@ public class ChallengeDownloadController {
     // todo 폴링 대신 freeze 방식으로 변환 생각
     private static final long POLL_INTERVAL_MS = 100;
 
-    private final ChallengeRepository challengeRepository;
     private final RedisCtfRequestProducer producer;
     private final ChallengeDownloadStore resultStore;
     private final ChallengeDownloadUrlCache urlCache;
     private final CtfTeamResolver teamResolver;
     private final ContestService contestService;
+    private final ChallengeExposure exposure;
 
     // 문제 코드로 다운로드 링크 요청
     @PostMapping(UrlNames.requestChallengeDownloadUrl)
@@ -49,13 +48,9 @@ public class ChallengeDownloadController {
         // 팀전이라 팀이 없는 참가자는 문제 파일을 받을 수 없다 (관리자·DEV 제외).
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
-        Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
-
-        // 비공개 문제(초안)는 관리자와 DEV만. 코드만 알면 받아갈 수 있으면 안 된다.
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
-        }
+        // 노출 규칙 (게임 모드): DEV 전부, ADMIN 공개 문제, 참가자는 공개 + 게임에 나온 문제 또는 우리 팀이 푼 문제.
+        // 규칙 밖은 없는 문제와 같은 404. 코드만 알면 받아갈 수 있으면 안 된다.
+        Challenge challenge = exposure.requireOpen(code, user);
         // 다운로드는 정적 문제만. Judge는 category로 할 일을 정해서, WEB·PWN 문제로 발행하면
         // 다운로드 링크 대신 컨테이너를 띄운다(누를 때마다 새 uuid라 하나씩 쌓인다).
         if (challenge.getCategory().usesInstance()) {
@@ -155,12 +150,4 @@ public class ChallengeDownloadController {
         return user.getUser().getId();
     }
 
-    private boolean canAccessDrafts(CustomUserDetails user) {
-        if (user == null) {
-            return false;
-        }
-        return user.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
-    }
 }

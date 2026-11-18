@@ -52,7 +52,8 @@ public class ContestService {
     static final boolean DEFAULT_CLEANUP_INSTANCES = true;
     static final boolean DEFAULT_CHALLENGES_VISIBLE = true;
     static final boolean DEFAULT_FREEZE_SCOREBOARD = false;
-    static final int DEFAULT_FREEZE_MINUTES = 30;
+    /** 순위 비공개 시작: 종료 몇 분 전 (화면 이름 "순위 비공개", 컬럼 이름은 예전 그대로 freeze_*) */
+    static final int DEFAULT_FREEZE_MINUTES = 120;
 
     private static final DateTimeFormatter LOG_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -92,10 +93,35 @@ public class ContestService {
         LocalDateTime now = now();
         Contest c = current().orElse(null);
         if (c == null) {
-            return new ScheduleResponse(null, null, null, null, ContestPhase.NOT_SCHEDULED, toKst(now));
+            return new ScheduleResponse(null, null, null, null, ContestPhase.NOT_SCHEDULED, toKst(now), null, false);
         }
         return new ScheduleResponse(c.getId(), c.getName(), toKst(c.getStartsAt()), toKst(c.getEndsAt()),
-                c.phaseAt(now), toKst(now));
+                c.phaseAt(now), toKst(now), toKst(scoreboardHiddenFrom(c).orElse(null)), isScoreboardHidden(c, now));
+    }
+
+    // ---------------------------------------------------------------- 순위 비공개
+
+    /**
+     * 순위 비공개가 시작되는 시각 = 종료 시각 - freezeMinutesBeforeEnd. 대회 설정에서 끄면(freezeScoreboard=false) 없다.
+     * (예전 이름은 "스코어보드 고정"이지만, 고정해서 보여 주는 대신 통째로 가린다)
+     */
+    public static Optional<LocalDateTime> scoreboardHiddenFrom(Contest c) {
+        if (c == null || !Boolean.TRUE.equals(c.getFreezeScoreboard()) || c.getFreezeMinutesBeforeEnd() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(c.getEndsAt().minusMinutes(c.getFreezeMinutesBeforeEnd()));
+    }
+
+    /** 비공개 시작 시각 이상, 종료 시각 미만이면 가린다. 종료와 함께 공개된다. */
+    public static boolean isScoreboardHidden(Contest c, LocalDateTime time) {
+        return scoreboardHiddenFrom(c)
+                .map(from -> !time.isBefore(from) && time.isBefore(c.getEndsAt()))
+                .orElse(false);
+    }
+
+    /** 지금 현재 대회의 순위가 참가자에게 가려져 있는지. ADMIN·DEV 는 호출하는 쪽에서 빼고 본다. */
+    public boolean isScoreboardHiddenNow() {
+        return current().map(c -> isScoreboardHidden(c, now())).orElse(false);
     }
 
     public AdminScheduleResponse getAdminSchedule() {

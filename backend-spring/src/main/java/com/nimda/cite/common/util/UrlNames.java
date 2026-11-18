@@ -220,7 +220,8 @@ public class UrlNames {
 
     //ChallengeQueryController (CTF)
     public static final String challengesUrl = "/api/ctf/challenges";
-    public static final String getChallengesUrl = "";
+    public static final String getChallengesUrl = "";          // 전체 목록 (ROLE_DEV 만)
+    public static final String getSolvedChallengesUrl = "/solved"; // 우리 팀이 푼 문제 (참가자)
     public static final String getChallengeDetailUrl = "/{code}";
 
     //ChallengeDownloadController (CTF)
