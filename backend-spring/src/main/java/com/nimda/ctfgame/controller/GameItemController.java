@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 게임(game.nimda.kr)이 부르는 물건 목록.
  * <pre>
- *   GET /api/ctf/game/items  -> 보이는 물건, 위치, 연결 문제 코드, 팀 소유 여부, (가졌으면) 이야기
+ *   GET /api/ctf/game/items  -> 보이는 물건의 key, 이름, 연결 문제 코드, 팀 소유 여부, (가졌으면) 이야기 (위치는 게임 objects.json)
  * </pre>
  * 권한은 SecurityConfig: ROLE_CTF_USER·CTF_MASTER·ADMIN·DEV (게임 입장 역할과 같다).
  * nimda.ctf-game.enabled=false 면 이 컨트롤러가 만들어지지 않아 404 가 된다.

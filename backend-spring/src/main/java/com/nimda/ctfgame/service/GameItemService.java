@@ -41,8 +41,7 @@ public class GameItemService {
             Challenge challenge = item.getChallengeId() == null ? null : challenges.get(item.getChallengeId());
             boolean openable = challenge != null && (staff || Boolean.TRUE.equals(challenge.getIsPublic()));
             boolean owned = challenge != null && solved.contains(challenge.getId());
-            return new GameItemResponse(item.getItemKey(), item.getName(), item.getZone(), item.getX(), item.getY(),
-                    item.getSortOrder(),
+            return new GameItemResponse(item.getItemKey(), item.getName(), item.getSortOrder(),
                     openable ? challenge.getCode() : null,
                     openable ? challenge.getTitle() : null,
                     owned,
@@ -71,9 +70,6 @@ public class GameItemService {
                 .name(request.name().trim())
                 .description(blankToNull(request.description()))
                 .challengeId(challenge == null ? null : challenge.getId())
-                .zone(request.zone())
-                .x(request.x())
-                .y(request.y())
                 .sortOrder(Objects.requireNonNullElse(request.sortOrder(), 0))
                 .visible(Boolean.TRUE.equals(request.visible()))
                 .build());
@@ -88,7 +84,6 @@ public class GameItemService {
         }
         Challenge challenge = findChallenge(request.challengeCode());
         item.update(request.name().trim(), blankToNull(request.description()), challenge == null ? null : challenge.getId(),
-                request.zone(), request.x(), request.y(),
                 Objects.requireNonNullElse(request.sortOrder(), 0), Boolean.TRUE.equals(request.visible()));
         return toAdmin(item, challenge);
     }
@@ -118,7 +113,7 @@ public class GameItemService {
     private static AdminGameItemResponse toAdmin(GameItem item, Challenge challenge) {
         return new AdminGameItemResponse(item.getId(), item.getItemKey(), item.getName(), item.getDescription(),
                 challenge == null ? null : challenge.getCode(), challenge == null ? null : challenge.getTitle(),
-                item.getZone(), item.getX(), item.getY(), item.getSortOrder(), Boolean.TRUE.equals(item.getVisible()),
+                item.getSortOrder(), Boolean.TRUE.equals(item.getVisible()),
                 item.getUpdatedAt());
     }
 

@@ -45,16 +45,6 @@ public class GameItem {
     @Column(name = "challenge_id")
     private Long challengeId;
 
-    /** 게임 구역 번호 (0 로비, 1 Stage1, 2 Stage2) */
-    @Column(nullable = false)
-    private Integer zone;
-
-    @Column(nullable = false)
-    private Integer x;
-
-    @Column(nullable = false)
-    private Integer y;
-
     @Builder.Default
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
@@ -80,13 +70,10 @@ public class GameItem {
         updatedAt = LocalDateTime.now();
     }
 
-    public void update(String name, String description, Long challengeId, int zone, int x, int y, int sortOrder, boolean visible) {
+    public void update(String name, String description, Long challengeId, int sortOrder, boolean visible) {
         this.name = name;
         this.description = description;
         this.challengeId = challengeId;
-        this.zone = zone;
-        this.x = x;
-        this.y = y;
         this.sortOrder = sortOrder;
         this.visible = visible;
     }

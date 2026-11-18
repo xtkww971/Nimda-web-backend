@@ -37,7 +37,7 @@ class GameItemServiceTest {
 
     private GameItem item(String key, Long challengeId, String description) {
         return GameItem.builder().itemKey(key).name(key + " 이름").description(description).challengeId(challengeId)
-                .zone(1).x(600).y(380).sortOrder(0).visible(true).build();
+                .sortOrder(0).visible(true).build();
     }
 
     private GameItemService service(Set<Long> solved) {
@@ -59,7 +59,7 @@ class GameItemServiceTest {
         assertFalse(locked.owned());
         assertNull(locked.description(), "아직 못 푼 물건의 이야기는 보내지 않는다");
         assertEquals("web-01", locked.challengeCode(), "못 풀어도 문제는 열 수 있어야 한다");
-        assertEquals(600, locked.x());
+        assertEquals("door 이름", locked.name());
     }
 
     @Test
@@ -90,7 +90,7 @@ class GameItemServiceTest {
         when(items.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AdminGameItemResponse created = service(Set.of()).create(new GameItemRequest(
-                "old-arcade", " 낡은 게임기 ", "이야기", "rev-01", 1, 600, 380, null, true));
+                "old-arcade", " 낡은 게임기 ", "이야기", "rev-01", null, true));
 
         assertEquals("낡은 게임기", created.name());
         assertEquals("rev-01", created.challengeCode());
@@ -102,13 +102,13 @@ class GameItemServiceTest {
     void createRejectsDuplicateKeyAndUnknownChallenge() {
         when(items.existsByItemKey("dup")).thenReturn(true);
         GameItemException duplicate = assertThrows(GameItemException.class, () -> service(Set.of()).create(
-                new GameItemRequest("dup", "이름", null, null, 0, 1, 1, 0, false)));
+                new GameItemRequest("dup", "이름", null, null, 0, false)));
         assertEquals(GameItemException.Kind.DUPLICATE_KEY, duplicate.kind());
 
         when(items.existsByItemKey("new")).thenReturn(false);
         when(challenges.findByCode("nope")).thenReturn(Optional.empty());
         GameItemException unknown = assertThrows(GameItemException.class, () -> service(Set.of()).create(
-                new GameItemRequest("new", "이름", null, "nope", 0, 1, 1, 0, false)));
+                new GameItemRequest("new", "이름", null, "nope", 0, false)));
         assertEquals(GameItemException.Kind.CHALLENGE_NOT_FOUND, unknown.kind());
         verify(items, never()).save(any());
     }
@@ -119,20 +119,20 @@ class GameItemServiceTest {
         when(items.findById(5L)).thenReturn(Optional.of(existing));
 
         GameItemException changed = assertThrows(GameItemException.class, () -> service(Set.of()).update(5L,
-                new GameItemRequest("renamed", "이름", null, null, 0, 1, 1, 0, true)));
+                new GameItemRequest("renamed", "이름", null, null, 0, true)));
         assertEquals(GameItemException.Kind.KEY_CHANGED, changed.kind());
 
         AdminGameItemResponse updated = service(Set.of()).update(5L,
-                new GameItemRequest("old-arcade", "새 이름", "  ", "", 2, 10, 20, 3, false));
+                new GameItemRequest("old-arcade", "새 이름", "  ", "", 3, false));
         assertNull(updated.challengeCode());
         assertNull(updated.description(), "빈 이야기는 null 로 저장한다");
-        assertEquals(2, updated.zone());
+        assertEquals(3, updated.sortOrder());
         assertFalse(updated.visible());
     }
 
     @Test
     void adminListIncludesHiddenAndUnlinkedItems() {
-        GameItem hidden = GameItem.builder().itemKey("box").name("상자").zone(2).x(1).y(1).visible(false).build();
+        GameItem hidden = GameItem.builder().itemKey("box").name("상자").visible(false).build();
         when(items.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(hidden, item("poster", null, "포스터")));
 
         List<AdminGameItemResponse> all = service(Set.of()).listAll();

@@ -1,8 +1,10 @@
 package com.nimda.ctfgame.dto;
 
 /**
- * 게임이 받는 물건 하나. 게임은 zone·x·y 에 물건을 그리고, 상호작용하면 challengeCode 로 문제 팝업(GET /api/ctf/challenges/{code})을 연다.
+ * 게임이 받는 물건 정보 하나. 게임은 objects.json(위치·그림)과 key 로 합쳐 그리고,
+ * 상호작용하면 challengeCode 로 문제 팝업(GET /api/ctf/challenges/{code})을 연다.
  *
+ * @param key           게임 objects.json 의 key
  * @param challengeCode 연결 문제 코드. 문제가 없거나 아직 공개 전이면 null (관리자·DEV 에게는 공개 전 문제도 보낸다)
  * @param owned         팀이 연결 문제를 풀었는지
  * @param description   이야기. owned 일 때만 값이 있고, 아니면 null (내용을 미리 보지 못하게 서버가 보내지 않는다)
@@ -10,9 +12,6 @@ package com.nimda.ctfgame.dto;
 public record GameItemResponse(
         String key,
         String name,
-        int zone,
-        int x,
-        int y,
         int sortOrder,
         String challengeCode,
         String challengeTitle,

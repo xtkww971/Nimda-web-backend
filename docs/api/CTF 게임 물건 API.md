@@ -1,7 +1,16 @@
 # CTF 게임 물건(아이템) API
 
-CTF 게임(`https://game.nimda.kr`, 저장소 `Nimda-Security/Nimda-ctf-game`)의 맵 위에 놓는 **물건**을 다룬다.
+CTF 게임(`https://game.nimda.kr`, 저장소 `Nimda-Security/Nimda-ctf-game`)의 맵 위 **물건의 정보**(어느 문제를 여는가, 이름, 이야기, 공개 여부)를 다룬다.
 참가자가 물건에 다가가 상호작용하면 연결된 **문제 팝업**이 뜨고, 팀이 그 문제를 풀면 물건을 **가진** 것으로 보고 **이야기**를 보여 준다.
+
+물건의 **위치·그림·크기는 여기 없다.** 게임 저장소의 `client/ctf/objects.json` 이 맡고, 두 쪽은 **`key` 로만** 이어진다
+(게임 `docs/MAP_OBJECTS.md`, 결정 D12: 맵이 바뀌어도 고치고 배포하는 곳은 게임 하나뿐. 백엔드는 관리 API 로 데이터만 넣는다).
+
+```
+게임 client/ctf/objects.json            백엔드 GET /api/ctf/game/items
+ key: old-arcade  ─────────key─────────▶ key: old-arcade
+ zone 1, x 600, y 380, 그림, 크기         challengeCode, name, owned, description
+```
 
 - 코드: `backend-spring/src/main/java/com/nimda/ctfgame/` (이벤트용, 이 패키지에만 모여 있음)
 - DB: `ctf_game_items` (Flyway `V41__Create_ctf_game_items.sql`)
@@ -43,7 +52,6 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
     {
       "key": "old-arcade",
       "name": "낡은 게임기",
-      "zone": 1, "x": 600, "y": 380,
       "sortOrder": 1,
       "challengeCode": "rev-crack-me",
       "challengeTitle": "회장님 최애 게임",
@@ -51,8 +59,7 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
       "description": "회장님이 아끼던 게임팩이 꽂혀 있다."
     },
     {
-      "key": "poster", "name": "포스터",
-      "zone": 0, "x": 100, "y": 100, "sortOrder": 0,
+      "key": "lobby-poster", "name": "동방 포스터", "sortOrder": 0,
       "challengeCode": null, "challengeTitle": null,
       "owned": false, "description": null
     }
@@ -62,9 +69,7 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
 
 | 필드 | 뜻 |
 |---|---|
-| `key` | 물건 고유 키. 게임이 물건을 구분한다 (바뀌지 않음) |
-| `zone` | 게임 구역 번호: `0` 동방 로비, `1` Stage1, `2` Stage2 |
-| `x`, `y` | 구역 안 좌표 (px). 물건의 바닥 가운데 |
+| `key` | 물건 고유 키 = 게임 `objects.json` 의 `key` (바뀌지 않음). 게임은 이 key 로 위치·그림과 합쳐 그린다 |
 | `challengeCode` | 상호작용하면 열 문제 → `GET /api/ctf/challenges/{code}` (상세), 파일 받기·플래그 제출은 기존 CTF API |
 | `owned` | 팀이 연결 문제를 풀었는지. 문제가 없는 물건은 늘 `false` |
 | `description` | 이야기. `owned` 일 때만 값이 있다 |
@@ -90,7 +95,6 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
   "name": "낡은 게임기",
   "description": "회장님이 아끼던 게임팩이 꽂혀 있다.",
   "challengeCode": "rev-crack-me",
-  "zone": 1, "x": 600, "y": 380,
   "sortOrder": 1,
   "visible": true
 }
@@ -98,16 +102,15 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
 
 | 필드 | 필수 | 검사 |
 |---|---|---|
-| `key` | O | `^[a-z0-9][a-z0-9-]{0,49}$` |
+| `key` | O | `^[a-z0-9][a-z0-9-]{0,49}$`. 게임 `objects.json` 의 key 를 그대로 쓴다 (`https://game.nimda.kr/ctf/objects.json` 의 `key`·`hint` 를 보고 고른다) |
 | `name` | O | 100자 이하 (앞뒤 공백 제거) |
 | `description` | | 5000자 이하. 빈 문자열은 `null` 로 저장 |
 | `challengeCode` | | 있는 문제 코드. 비우면 연결 없음 |
-| `zone` | O | 0~50 |
-| `x`, `y` | O | 0~10000 |
 | `sortOrder` | | -1000~1000, 기본 0 |
 | `visible` | | 기본 `false` (만든 직후엔 참가자에게 안 보임) |
 
-관리 응답 항목: `id, key, name, description, challengeCode, challengeTitle, zone, x, y, sortOrder, visible, updatedAt`.
+관리 응답 항목: `id, key, name, description, challengeCode, challengeTitle, sortOrder, visible, updatedAt`.
+`objects.json` 에는 있는데 아이템이 없는 key, 아이템은 있는데 `objects.json` 에 없는 key 를 어떻게 보여 줄지는 게임이 정한다 (`MAP_OBJECTS.md` 3장).
 
 ## 오류
 
@@ -136,8 +139,8 @@ com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 
 
 ## 확인한 것 (2026-11-18, 로컬: 운영 스키마 + nimda-mysql)
 
-- Flyway: `Successfully applied 1 migration ... now at version v41`
-- 단위 테스트 `GameItemServiceTest` 8개, 백엔드 전체 테스트 50개 (Skipped 2) 통과
+- Flyway: `Successfully applied 1 migration ... now at version v41` (D12 로 위치 열을 뺀 V41 로 다시 적용)
+- 단위 테스트 `GameItemServiceTest` 8개, 백엔드 전체 테스트 51개 (Skipped 2) 통과
 - 실제 호출: 등록 201, 중복 409, 잘못된 key 400, 없는 문제 400, key 변경 400, 없는 id 404, 참가자→관리 403, 로그인 없음 403
 - 참가자 목록: 숨긴 물건 빠짐, 못 푼 물건 이야기 `null`, 풀이 기록을 넣으면 그 물건만 `owned: true` + 이야기
 - `CTF_GAME_ENABLED=false` → 두 경로 모두 404
