@@ -17,7 +17,9 @@ public record ChallengeSummaryResponse(
         IsolationType isolationType,
         /** 첨부파일(문제 파일)이 붙어 있는지. 실제 S3 키는 내보내지 않는다. */
         boolean hasAttachment,
-        Boolean isPublic
+        Boolean isPublic,
+        /** 현재 대회에서 이 문제를 푼 팀 수 (문제 관리 화면의 "해결 팀") */
+        long solveCount
 ) {
     public static ChallengeSummaryResponse from(Challenge challenge, long solveCount) {
         return new ChallengeSummaryResponse(
@@ -31,7 +33,8 @@ public record ChallengeSummaryResponse(
                 challenge.getDecreasePoint(),
                 challenge.getIsolationType(),
                 challenge.getAttachmentKey() != null && !challenge.getAttachmentKey().isBlank(),
-                challenge.getIsPublic()
+                challenge.getIsPublic(),
+                solveCount
         );
     }
 }

@@ -1,5 +1,6 @@
 package judgeServer.domain.solve.repository;
 
+import judgeServer.domain.challenge.dto.SolvedChallengeRow;
 import judgeServer.domain.scoreboard.dto.RecentSolveResponse;
 import judgeServer.domain.solve.entity.Solve;
 import org.springframework.data.domain.Pageable;
@@ -66,4 +67,30 @@ public interface SolveRepository extends JpaRepository<Solve, Long> {
             order by s.solvedAt desc
             """)
     List<RecentSolveResponse> findRecentByTeamId(@Param("teamId") Long teamId, Pageable pageable);
+
+    /** 팀이 대회 안에서 푼 문제 (CTF 사이트 "해결한 문제"). 푼 순서대로. */
+    @Query("""
+            select new judgeServer.domain.challenge.dto.SolvedChallengeRow(
+                c.id, c.code, c.title, c.category, c.isolationType, c.attachmentKey, s.awardedPoints, s.solvedAt, u.nickname)
+            from Solve s
+                join User u on u.id = s.userId
+                join Challenge c on c.id = s.challengeId
+            where s.teamId = :teamId
+                and (s.contestId = :contestId or (:contestId is null and s.contestId is null))
+            order by s.solvedAt asc, s.id asc
+            """)
+    List<SolvedChallengeRow> findSolvedRowsByTeam(@Param("teamId") Long teamId, @Param("contestId") Long contestId);
+
+    /** 팀이 없는 사용자(ADMIN·DEV 시험 등)가 대회 안에서 직접 푼 문제. */
+    @Query("""
+            select new judgeServer.domain.challenge.dto.SolvedChallengeRow(
+                c.id, c.code, c.title, c.category, c.isolationType, c.attachmentKey, s.awardedPoints, s.solvedAt, u.nickname)
+            from Solve s
+                join User u on u.id = s.userId
+                join Challenge c on c.id = s.challengeId
+            where s.userId = :userId
+                and (s.contestId = :contestId or (:contestId is null and s.contestId is null))
+            order by s.solvedAt asc, s.id asc
+            """)
+    List<SolvedChallengeRow> findSolvedRowsByUser(@Param("userId") Long userId, @Param("contestId") Long contestId);
 }

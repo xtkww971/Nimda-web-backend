@@ -19,7 +19,7 @@ public class ChallengeController {
 
     private final ChallengeService challengeService;
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
+    @PreAuthorize("hasRole('DEV')")
     @PostMapping(value = UrlNames.createChallengeUrl, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createChallenge(@ModelAttribute @Valid AddChallengeRequest request) {
         Challenge challenge = challengeService.addChallenge(request);
@@ -28,13 +28,13 @@ public class ChallengeController {
         return ApiResponse.ok(challenge.getId()).toResponse();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
+    @PreAuthorize("hasRole('DEV')")
     @PostMapping(UrlNames.toggleChallengePublicUrl)
     public ResponseEntity<?> toggleIsPublic(@PathVariable Long id) {
         return ApiResponse.ok(challengeService.toggleIsPublic(id)).toResponse();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'DEV')")
+    @PreAuthorize("hasRole('DEV')")
     @DeleteMapping(UrlNames.deleteChallengeUrl)
     public ResponseEntity<?> deleteChallenge(@PathVariable Long id) {
         challengeService.deleteChallenge(id);

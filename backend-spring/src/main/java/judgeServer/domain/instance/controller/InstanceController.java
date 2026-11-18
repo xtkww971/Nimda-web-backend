@@ -8,14 +8,13 @@ import com.nimda.cite.common.util.UrlNames;
 import com.nimda.cite.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import judgeServer.domain.challenge.entity.Challenge;
-import judgeServer.domain.challenge.repository.ChallengeRepository;
+import judgeServer.domain.challenge.exposure.ChallengeExposure;
 import judgeServer.domain.contest.service.ContestService;
 import judgeServer.domain.group.service.CtfTeamResolver;
 import judgeServer.domain.instance.service.CtfServerStatus;
 import judgeServer.domain.instance.service.InstanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,11 +39,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class InstanceController {
 
-    private final ChallengeRepository challengeRepository;
     private final InstanceService instanceService;
     private final CtfServerStatus serverStatus;
     private final CtfTeamResolver teamResolver;
     private final ContestService contestService;
+    private final ChallengeExposure exposure;
 
     // 컨테이너 생성 요청
     @PostMapping(UrlNames.createInstanceUrl)
@@ -122,11 +121,9 @@ public class InstanceController {
     private Challenge findChallenge(String code, CustomUserDetails user) {
         teamResolver.requireTeamOrStaff(user);
         contestService.requireChallengesAccessible(user);
-        Challenge challenge = challengeRepository.findByCode(code)
-                .orElseThrow(() -> new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND));
-        if (!Boolean.TRUE.equals(challenge.getIsPublic()) && !canAccessDrafts(user)) {
-            throw new GlobalNimdaException(ErrorCode.CHALLENGE_NOT_FOUND);
-        }
+        // 노출 규칙 (게임 모드): DEV 전부, ADMIN 공개 문제, 참가자는 공개 + 게임에 나온 문제 또는 우리 팀이 푼 문제.
+        // 규칙 밖은 없는 문제와 같은 404. 코드만 알면 받아갈 수 있으면 안 된다.
+        Challenge challenge = exposure.requireOpen(code, user);
         return challenge;
     }
 
@@ -137,12 +134,4 @@ public class InstanceController {
         return user.getUser().getId();
     }
 
-    private boolean canAccessDrafts(CustomUserDetails user) {
-        if (user == null) {
-            return false;
-        }
-        return user.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_DEV".equals(role));
-    }
 }
