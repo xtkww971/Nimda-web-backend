@@ -70,6 +70,11 @@ public class GameItem {
         updatedAt = LocalDateTime.now();
     }
 
+    /** 문제 연결만 바꾼다 (연결 API). null 이면 연결 해제 */
+    public void linkTo(Long challengeId) {
+        this.challengeId = challengeId;
+    }
+
     public void update(String name, String description, Long challengeId, int sortOrder, boolean visible) {
         this.name = name;
         this.description = description;

@@ -110,14 +110,14 @@ public class GameItemService {
         return challengeRepository.findAllById(ids).stream().collect(Collectors.toMap(Challenge::getId, Function.identity()));
     }
 
-    private static AdminGameItemResponse toAdmin(GameItem item, Challenge challenge) {
+    static AdminGameItemResponse toAdmin(GameItem item, Challenge challenge) {
         return new AdminGameItemResponse(item.getId(), item.getItemKey(), item.getName(), item.getDescription(),
                 challenge == null ? null : challenge.getCode(), challenge == null ? null : challenge.getTitle(),
                 item.getSortOrder(), Boolean.TRUE.equals(item.getVisible()),
                 item.getUpdatedAt());
     }
 
-    private static String blankToNull(String text) {
+    static String blankToNull(String text) {
         return text == null || text.isBlank() ? null : text;
     }
 }
