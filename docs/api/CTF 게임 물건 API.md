@@ -15,6 +15,7 @@ CTF 게임(`https://game.nimda.kr`, 저장소 `Nimda-Security/Nimda-ctf-game`)�
 - 코드: `backend-spring/src/main/java/com/nimda/ctfgame/` (이벤트용, 이 패키지에만 모여 있음)
 - DB: `ctf_game_items` (Flyway `V41__Create_ctf_game_items.sql`)
 - 켜고 끄기: `CTF_GAME_ENABLED` (docker-compose, 기본 `true`). `false` 면 아래 API 가 모두 **404**
+- 같은 패키지의 게임 설정(Stage2 시간 개방): [CTF 게임 설정 API.md](CTF%20게임%20설정%20API.md)
 
 ```
 com/nimda/ctfgame/          (com.nimda.cite 와 따로 둔 최상위 패키지. 안쪽은 다른 domain 과 같은 구성)
